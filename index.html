@@ -1,0 +1,2543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAS to Python Converter</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --surface2: #0f3460;
+    --accent: #e94560;
+    --accent2: #533483;
+    --text: #eee;
+    --text-dim: #a0a0b8;
+    --green: #4ecca3;
+    --orange: #f5a623;
+    --mono: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+    --radius: 8px;
+  }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: linear-gradient(135deg, var(--surface) 0%, var(--accent2) 100%);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 2px solid var(--accent);
+  }
+
+  header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  header h1 span { color: var(--accent); }
+
+  .badge {
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    padding: 12px 32px;
+    background: var(--surface);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  button {
+    font-family: inherit;
+    border: none;
+    border-radius: var(--radius);
+    padding: 8px 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  button:active { transform: scale(0.97); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #d63050; }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .btn-secondary:hover { background: #1a4a80; }
+
+  .btn-green {
+    background: var(--green);
+    color: #111;
+  }
+  .btn-green:hover { background: #3bb88e; }
+
+  .spacer { flex: 1; }
+
+  .status {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    padding: 0 8px;
+  }
+
+  .main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    min-height: 0;
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    position: relative;
+  }
+
+  .pane:first-child { border-right: 2px solid var(--accent2); }
+
+  .pane-header {
+    padding: 10px 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    background: rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pane-header .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .dot-sas { background: var(--orange); }
+  .dot-py  { background: var(--green); }
+
+  .editor-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  textarea {
+    width: 100%;
+    height: 100%;
+    resize: none;
+    background: transparent;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    padding: 16px 20px;
+    border: none;
+    outline: none;
+    tab-size: 4;
+    position: absolute;
+    top: 0; left: 0;
+  }
+
+  textarea::placeholder { color: var(--text-dim); }
+
+  .output-area {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    padding: 16px 20px;
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    position: absolute;
+    top: 0; left: 0;
+  }
+
+  .output-area .kw  { color: #c678dd; }
+  .output-area .fn  { color: #61afef; }
+  .output-area .str { color: #98c379; }
+  .output-area .com { color: #5c6370; font-style: italic; }
+  .output-area .num { color: #d19a66; }
+  .output-area .op  { color: #56b6c2; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--green);
+    color: #111;
+    padding: 10px 24px;
+    border-radius: 24px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+
+  .sample-dropdown {
+    position: relative;
+  }
+  .sample-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--surface);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: var(--radius);
+    min-width: 240px;
+    z-index: 50;
+    margin-top: 4px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    overflow: hidden;
+  }
+  .sample-menu.open { display: block; }
+  .sample-menu button {
+    width: 100%;
+    text-align: left;
+    border-radius: 0;
+    padding: 10px 16px;
+    background: transparent;
+    color: var(--text);
+    font-weight: 400;
+    font-size: 0.82rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .sample-menu button:hover { background: var(--surface2); }
+
+  footer {
+    padding: 8px 32px;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    background: var(--surface);
+    border-top: 1px solid rgba(255,255,255,0.06);
+    text-align: center;
+  }
+
+  @media (max-width: 800px) {
+    .main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+    .pane:first-child { border-right: none; border-bottom: 2px solid var(--accent2); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SAS <span>&rarr;</span> Python</h1>
+  <span class="badge">Offline</span>
+</header>
+
+<div class="toolbar">
+  <button class="btn-primary" onclick="convert()" title="Ctrl+Enter">Convert</button>
+  <button class="btn-green" onclick="copyOutput()">Copy Python</button>
+  <button class="btn-secondary" onclick="clearAll()">Clear</button>
+  <div class="sample-dropdown">
+    <button class="btn-secondary" onclick="toggleSamples()">Load Sample</button>
+    <div class="sample-menu" id="sampleMenu"></div>
+  </div>
+  <span class="spacer"></span>
+  <span class="status" id="status"></span>
+</div>
+
+<div class="main">
+  <div class="pane">
+    <div class="pane-header"><span class="dot dot-sas"></span> SAS Input</div>
+    <div class="editor-wrap">
+      <textarea id="sasInput" placeholder="Paste your SAS code here..." spellcheck="false"></textarea>
+    </div>
+  </div>
+  <div class="pane">
+    <div class="pane-header"><span class="dot dot-py"></span> Python Output</div>
+    <div class="editor-wrap">
+      <div class="output-area" id="pyOutput"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<footer>
+  SAS to Python Converter &mdash; Rule-based transpiler. Review output before use.
+</footer>
+
+<script>
+// ── Samples ──────────────────────────────────────────────────────────────
+
+const SAMPLES = {
+  "DATA Step Basics": `/* Basic DATA step with conditional logic */
+data work.customers_clean;
+    set raw.customers;
+    where age >= 18;
+    length full_name $100;
+    full_name = catx(' ', first_name, last_name);
+    if income > 100000 then income_group = 'High';
+    else if income > 50000 then income_group = 'Medium';
+    else income_group = 'Low';
+    age_squared = age ** 2;
+    keep customer_id full_name age income income_group age_squared;
+run;`,
+
+  "PROC SQL": `/* SQL query with joins and aggregation */
+proc sql;
+    create table work.summary as
+    select
+        a.department,
+        a.region,
+        count(*) as employee_count,
+        mean(a.salary) as avg_salary,
+        sum(b.revenue) as total_revenue
+    from work.employees as a
+    inner join work.sales as b
+        on a.employee_id = b.employee_id
+    where a.status = 'Active'
+    group by a.department, a.region
+    having count(*) >= 5
+    order by total_revenue desc;
+quit;`,
+
+  "PROC MEANS & FREQ": `/* Descriptive statistics */
+proc means data=work.sales n mean std min max median;
+    class region product_type;
+    var revenue quantity discount;
+    output out=work.sales_stats
+        mean=avg_revenue avg_quantity avg_discount
+        std=std_revenue std_quantity std_discount;
+run;
+
+proc freq data=work.customers;
+    tables gender * income_group / chisq nocum nopercent;
+run;`,
+
+  "PROC SORT & MERGE": `/* Sort and merge datasets */
+proc sort data=work.orders;
+    by customer_id order_date;
+run;
+
+proc sort data=work.customers;
+    by customer_id;
+run;
+
+data work.order_details;
+    merge work.orders(in=a) work.customers(in=b);
+    by customer_id;
+    if a and b;
+run;`,
+
+  "PROC IMPORT/EXPORT": `/* File import and export */
+proc import datafile="/data/raw/transactions.csv"
+    out=work.transactions
+    dbms=csv
+    replace;
+    getnames=yes;
+    guessingrows=5000;
+run;
+
+proc export data=work.report
+    outfile="/output/final_report.xlsx"
+    dbms=xlsx
+    replace;
+    sheet="Summary";
+run;`,
+
+  "Macro & DO Loop": `/* Macro with iterative processing */
+%macro process_monthly(start_year=, end_year=);
+    %do year = &start_year %to &end_year;
+        %do month = 1 %to 12;
+            %let mm = %sysfunc(putn(&month, z2.));
+            data work.monthly_&year._&mm;
+                set raw.transactions;
+                where year(trans_date) = &year
+                  and month(trans_date) = &month;
+                amount_adj = amount * 1.05;
+            run;
+        %end;
+    %end;
+%mend process_monthly;
+
+%process_monthly(start_year=2023, end_year=2025);`,
+
+  "PROC REG & LOGISTIC": `/* Regression models */
+proc reg data=work.housing;
+    model price = sqft bedrooms bathrooms lot_size year_built / vif;
+    output out=work.reg_results predicted=pred_price residual=resid;
+run;
+
+proc logistic data=work.credit descending;
+    class education (ref='High School') employment (ref='Unemployed') / param=ref;
+    model default = age income education employment credit_score;
+    output out=work.logistic_results predicted=prob_default;
+run;`,
+
+  "PROC TRANSPOSE": `/* Reshape data */
+proc transpose data=work.quarterly_sales
+    out=work.sales_wide
+    prefix=Q;
+    by product_id product_name;
+    id quarter;
+    var revenue;
+run;
+
+proc transpose data=work.sales_wide
+    out=work.sales_long(rename=(col1=revenue _name_=quarter));
+    by product_id product_name;
+    var Q1 Q2 Q3 Q4;
+run;`,
+
+  "Formats & Informats": `/* Custom formats and data manipulation */
+proc format;
+    value $region_fmt
+        'NE' = 'Northeast'
+        'SE' = 'Southeast'
+        'MW' = 'Midwest'
+        'SW' = 'Southwest'
+        'W'  = 'West'
+        other = 'Unknown';
+    value age_grp
+        low-17  = 'Minor'
+        18-34   = 'Young Adult'
+        35-54   = 'Middle Age'
+        55-high = 'Senior';
+run;
+
+data work.formatted;
+    set work.raw_data;
+    format region $region_fmt. age age_grp.;
+    region_name = put(region, $region_fmt.);
+    age_label = put(age, age_grp.);
+run;`,
+
+  "FIRST./LAST. & RETAIN": `/* By-group processing and retained variables */
+proc sort data=work.transactions;
+    by customer_id trans_date;
+run;
+
+data work.customer_summary;
+    set work.transactions;
+    by customer_id;
+    retain running_total 0;
+    if first.customer_id then running_total = 0;
+    running_total = running_total + amount;
+    if last.customer_id then output;
+run;`,
+
+  "Arrays & DO WHILE": `/* Array processing and loop variants */
+data work.scored;
+    set work.raw_scores;
+    array scores{5} score1-score5;
+    array adj_scores{5} adj1-adj5;
+    total = 0;
+    do i = 1 to 5;
+        if scores{i} = . then scores{i} = 0;
+        adj_scores{i} = scores{i} * 1.1;
+        total = total + adj_scores{i};
+    end;
+    mean_score = total / 5;
+    do while (mean_score > 100);
+        mean_score = mean_score * 0.95;
+    end;
+    drop i;
+run;`,
+
+  "SELECT/WHEN & IN": `/* SELECT-WHEN blocks and IN operator */
+data work.classified;
+    set work.products;
+    if category in ('Electronics', 'Computers', 'Software') then dept = 'Tech';
+    select (region);
+        when ('North') zone = 1;
+        when ('South') zone = 2;
+        when ('East')  zone = 3;
+        when ('West')  zone = 4;
+        otherwise zone = 0;
+    end;
+    where price between 10 and 1000;
+    where also name like 'Premium%';
+run;`,
+
+  "PROC CONTENTS & DATASETS": `/* Dataset metadata and management */
+proc contents data=work.sales varnum;
+run;
+
+proc datasets lib=work nolist;
+    delete temp1 temp2 temp3;
+    change old_name = new_name;
+    modify sales;
+        rename revenue = total_revenue;
+        label total_revenue = 'Total Revenue ($)';
+    run;
+quit;`,
+
+  "Date Literals & Functions": `/* Date handling */
+data work.dates;
+    set work.events;
+    start = '01JAN2024'd;
+    cutoff_dt = '15MAR2024:09:30:00'dt;
+    days_diff = intck('day', start_date, end_date);
+    next_month = intnx('month', today(), 1, 'beginning');
+    formatted = put(date_col, date9.);
+    quarter = qtr(date_col);
+    day_of_week = weekday(date_col);
+run;`
+};
+
+// ── SAS Function Map ─────────────────────────────────────────────────────
+
+const FN_MAP = {
+  // String functions
+  'cats':      { py: "'{{}}'.join([str(x).strip() for x in [{}]])", note: 'concatenate stripped' },
+  'catx':      { py: "{0}.join([str(x) for x in [{1}]])", special: 'catx' },
+  'cat':       { py: "'{{}}'.join([str(x) for x in [{}]])", note: 'concatenate' },
+  'strip':     { py: '{}.strip()' },
+  'trim':      { py: '{}.strip()' },
+  'left':      { py: '{}.lstrip()' },
+  'right':     { py: '{}.rstrip()' },
+  'compress':  { py: "re.sub(r'\\s+', '', {})" },
+  'upcase':    { py: '{}.upper()' },
+  'lowcase':   { py: '{}.lower()' },
+  'propcase':  { py: '{}.title()' },
+  'substr':    { py: '{}[{}-1:{}-1+{}]', special: 'substr' },
+  'length':    { py: 'len({})' },
+  'index':     { py: '{}.find({})' },
+  'find':      { py: '{}.find({})' },
+  'scan':      { py: '{}.split()[{}-1]', special: 'scan' },
+  'reverse':   { py: '{}[::-1]' },
+  'repeat':    { py: '{} * ({} + 1)' },
+  'tranwrd':   { py: '{}.replace({}, {})' },
+  'translate':  { py: '{}.replace({}, {})' },
+  'compress':  { py: "re.sub(r'[{}]', '', {})", special: 'compress' },
+
+  // Numeric functions
+  'abs':       { py: 'abs({})' },
+  'ceil':      { py: 'math.ceil({})' },
+  'floor':     { py: 'math.floor({})' },
+  'round':     { py: 'round({}, {})' },
+  'int':       { py: 'int({})' },
+  'max':       { py: 'max({})' },
+  'min':       { py: 'min({})' },
+  'mod':       { py: '{} % {}' },
+  'sqrt':      { py: 'math.sqrt({})' },
+  'log':       { py: 'math.log({})' },
+  'log10':     { py: 'math.log10({})' },
+  'log2':      { py: 'math.log2({})' },
+  'exp':       { py: 'math.exp({})' },
+  'sum':       { py: 'sum([{}])' },
+  'mean':      { py: 'statistics.mean([{}])' },
+  'ranuni':    { py: 'random.random()' },
+  'rannor':    { py: 'random.gauss(0, 1)' },
+
+  // Date functions
+  'today':     { py: "pd.Timestamp.now().normalize()" },
+  'date':      { py: "pd.Timestamp.now().normalize()" },
+  'datetime':  { py: "pd.Timestamp.now()" },
+  'datepart':  { py: '{}.normalize()' },
+  'timepart':  { py: '{}.time()' },
+  'year':      { py: '{}.year' },
+  'month':     { py: '{}.month' },
+  'day':       { py: '{}.day' },
+  'hour':      { py: '{}.hour' },
+  'minute':    { py: '{}.minute' },
+  'second':    { py: '{}.second' },
+  'weekday':   { py: '{}.dayofweek + 1' },
+  'qtr':       { py: '{}.quarter' },
+  'intnx':     { py: "pd.DateOffset", special: 'intnx' },
+  'intck':     { py: "relativedelta", special: 'intck' },
+  'mdy':       { py: "pd.Timestamp(year={2}, month={0}, day={1})" },
+  'input':     { py: "pd.to_datetime({})", special: 'input' },
+  'put':       { py: "str({})", special: 'put' },
+
+  // Missing / null
+  'missing':   { py: 'pd.isna({})' },
+  'nmiss':     { py: 'sum(pd.isna(x) for x in [{}])' },
+  'n':         { py: 'sum(pd.notna(x) for x in [{}])' },
+  'coalesce':  { py: 'next((x for x in [{}] if pd.notna(x)), None)' },
+  'coalescec': { py: 'next((x for x in [{}] if pd.notna(x) and x.strip()), None)' },
+  'ifn':       { py: '{1} if {0} else {2}' },
+  'ifc':       { py: '{1} if {0} else {2}' },
+
+  // Type
+  'input':     { py: 'pd.to_numeric({}, errors="coerce")' },
+};
+
+// ── Converter Engine ─────────────────────────────────────────────────────
+
+let _lastIfConds = null;
+let _lastIfCol = null;
+let _inSelect = false;
+let _selectVar = null;
+let _selectConds = [];
+let _selectVals = [];
+let _selectDefault = null;
+
+function convert() {
+  const sas = document.getElementById('sasInput').value.trim();
+  if (!sas) { showToast('Paste some SAS code first'); return; }
+
+  const t0 = performance.now();
+  let py;
+  try {
+    py = convertSAS(sas);
+  } catch(e) {
+    py = `# Conversion error: ${e.message}\n# Please check the SAS input for syntax issues.\n\n# Original SAS code:\n${sas.split('\n').map(l => '# ' + l).join('\n')}`;
+  }
+  const ms = Math.round(performance.now() - t0);
+  document.getElementById('pyOutput').innerHTML = highlightPython(py);
+  document.getElementById('status').textContent = `Converted in ${ms}ms`;
+}
+
+function convertSAS(sas) {
+  // Normalize line endings
+  let code = sas.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // Collect needed imports
+  const imports = new Set();
+  imports.add('import pandas as pd');
+
+  // Split into blocks
+  const blocks = splitBlocks(code);
+  const pyBlocks = [];
+
+  for (const block of blocks) {
+    const result = convertBlock(block, imports);
+    if (result.trim()) pyBlocks.push(result);
+  }
+
+  // Build import header
+  const importLines = buildImports(imports, sas);
+  const header = importLines.join('\n');
+  const body = pyBlocks.join('\n\n');
+
+  const lint = [
+    '# NOTE: Review before running. Bare variable names in expressions (e.g. age ** 2)',
+    '#   may need df["col"] prefix (e.g. df["age"] ** 2). Check all lines with # TODO.',
+  ].join('\n');
+
+  return lint + '\n\n' + header + (header && body ? '\n\n' : '') + body;
+}
+
+function buildImports(imports, sas) {
+  const lines = [];
+  const sasLower = sas.toLowerCase();
+  if (sasLower.match(/\b(ceil|floor|sqrt|log|log10|log2|exp)\b/)) imports.add('import math');
+  if (sasLower.match(/\b(ranuni|rannor|rand)\b/)) imports.add('import random');
+  if (sasLower.match(/\bmean\s*\(/)) imports.add('import statistics');
+  if (sasLower.match(/\bcompress\s*\(/)) imports.add('import re');
+  if (sasLower.match(/\bproc\s+(reg|logistic|glm)\b/i)) {
+    imports.add('import statsmodels.api as sm');
+    imports.add('import statsmodels.formula.api as smf');
+  }
+  if (sasLower.match(/\bproc\s+transpose\b/i)) { /* pandas suffices */ }
+
+  // Sort: stdlib, then third-party
+  const stdlib = ['import math', 'import random', 'import re', 'import statistics', 'import os', 'from datetime import datetime, date, timedelta'];
+  const thirdParty = ['import pandas as pd', 'import numpy as np', 'import statsmodels.api as sm', 'import statsmodels.formula.api as smf'];
+
+  for (const s of stdlib) { if (imports.has(s)) lines.push(s); }
+  if (lines.length > 0 && [...imports].some(i => thirdParty.includes(i))) lines.push('');
+  for (const s of thirdParty) { if (imports.has(s)) lines.push(s); }
+
+  return lines;
+}
+
+function splitBlocks(code) {
+  const blocks = [];
+  let current = '';
+  const lines = code.split('\n');
+
+  let inBlock = false;
+  let blockType = '';
+  let depth = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Skip empty lines between blocks
+    if (!inBlock && !trimmed) continue;
+
+    // Detect block start
+    if (!inBlock) {
+      const procMatch = trimmed.match(/^proc\s+(\w+)\b/i);
+      const dataMatch = trimmed.match(/^data\s+/i);
+      const macroDefMatch = trimmed.match(/^%macro\s+/i);
+      const macroCallMatch = trimmed.match(/^%\w+\s*[\(;]/i);
+      const commentMatch = trimmed.match(/^\/\*/) || trimmed.match(/^\*/);
+      const libMatch = trimmed.match(/^libname\s+/i);
+      const fmtMatch = trimmed.match(/^proc\s+format/i);
+
+      if (procMatch || dataMatch || macroDefMatch || fmtMatch) {
+        inBlock = true;
+        blockType = procMatch ? procMatch[1].toLowerCase() : (dataMatch ? 'data' : (fmtMatch ? 'format' : 'macro'));
+        current = line;
+        depth = 0;
+        if (trimmed.match(/;\s*$/)) {
+          // Check if this is a single-line terminated block
+          if (trimmed.match(/\b(run|quit)\s*;\s*$/i)) {
+            blocks.push(current);
+            current = '';
+            inBlock = false;
+          }
+        }
+        continue;
+      }
+
+      if (macroCallMatch && !macroDefMatch) {
+        // Single line macro call
+        current = line;
+        // Collect until semicolon
+        if (trimmed.endsWith(';')) {
+          blocks.push(current);
+          current = '';
+        } else {
+          inBlock = true;
+          blockType = 'macrocall';
+        }
+        continue;
+      }
+
+      if (libMatch) {
+        current = line;
+        if (trimmed.endsWith(';')) {
+          blocks.push(current);
+          current = '';
+        } else {
+          inBlock = true;
+          blockType = 'lib';
+        }
+        continue;
+      }
+
+      // Standalone comment block
+      if (trimmed.startsWith('/*')) {
+        current = line;
+        if (trimmed.includes('*/')) {
+          blocks.push(current);
+          current = '';
+        } else {
+          inBlock = true;
+          blockType = 'comment';
+        }
+        continue;
+      }
+
+      // Line comment
+      if (trimmed.startsWith('*')) {
+        current = line;
+        if (trimmed.endsWith(';')) {
+          blocks.push(current);
+          current = '';
+        } else {
+          inBlock = true;
+          blockType = 'comment';
+        }
+        continue;
+      }
+
+      // Anything else, accumulate
+      if (trimmed) {
+        blocks.push(line);
+      }
+      continue;
+    }
+
+    // Inside a block
+    current += '\n' + line;
+
+    if (blockType === 'comment') {
+      if (trimmed.includes('*/') || trimmed.endsWith(';')) {
+        blocks.push(current);
+        current = '';
+        inBlock = false;
+      }
+      continue;
+    }
+
+    if (blockType === 'lib' || blockType === 'macrocall') {
+      if (trimmed.endsWith(';')) {
+        blocks.push(current);
+        current = '';
+        inBlock = false;
+      }
+      continue;
+    }
+
+    // Track %do depth for macros
+    if (blockType === 'macro') {
+      if (trimmed.match(/^%mend\b/i)) {
+        blocks.push(current);
+        current = '';
+        inBlock = false;
+      }
+      continue;
+    }
+
+    // End with run; or quit;
+    if (trimmed.match(/^(run|quit)\s*;\s*$/i)) {
+      blocks.push(current);
+      current = '';
+      inBlock = false;
+    }
+  }
+
+  if (current.trim()) blocks.push(current);
+  return blocks;
+}
+
+function convertBlock(block, imports) {
+  const trimmed = block.trim();
+
+  // Comment block
+  if (trimmed.startsWith('/*') || (trimmed.startsWith('*') && !trimmed.startsWith('%'))) {
+    return convertComment(trimmed);
+  }
+
+  // LIBNAME
+  if (trimmed.match(/^libname\s+/i)) {
+    return convertLibname(trimmed);
+  }
+
+  // PROC FORMAT
+  if (trimmed.match(/^proc\s+format/i)) {
+    return convertProcFormat(trimmed, imports);
+  }
+
+  // PROC SQL
+  if (trimmed.match(/^proc\s+sql/i)) {
+    return convertProcSQL(trimmed, imports);
+  }
+
+  // PROC MEANS / SUMMARY
+  if (trimmed.match(/^proc\s+(means|summary)/i)) {
+    return convertProcMeans(trimmed, imports);
+  }
+
+  // PROC FREQ
+  if (trimmed.match(/^proc\s+freq/i)) {
+    return convertProcFreq(trimmed, imports);
+  }
+
+  // PROC SORT
+  if (trimmed.match(/^proc\s+sort/i)) {
+    return convertProcSort(trimmed, imports);
+  }
+
+  // PROC PRINT
+  if (trimmed.match(/^proc\s+print/i)) {
+    return convertProcPrint(trimmed, imports);
+  }
+
+  // PROC IMPORT
+  if (trimmed.match(/^proc\s+import/i)) {
+    return convertProcImport(trimmed, imports);
+  }
+
+  // PROC EXPORT
+  if (trimmed.match(/^proc\s+export/i)) {
+    return convertProcExport(trimmed, imports);
+  }
+
+  // PROC TRANSPOSE
+  if (trimmed.match(/^proc\s+transpose/i)) {
+    return convertProcTranspose(trimmed, imports);
+  }
+
+  // PROC REG
+  if (trimmed.match(/^proc\s+reg/i)) {
+    return convertProcReg(trimmed, imports);
+  }
+
+  // PROC LOGISTIC
+  if (trimmed.match(/^proc\s+logistic/i)) {
+    return convertProcLogistic(trimmed, imports);
+  }
+
+  // PROC CONTENTS
+  if (trimmed.match(/^proc\s+contents/i)) {
+    return convertProcContents(trimmed, imports);
+  }
+
+  // PROC DATASETS
+  if (trimmed.match(/^proc\s+datasets/i)) {
+    return convertProcDatasets(trimmed, imports);
+  }
+
+  // PROC TABULATE
+  if (trimmed.match(/^proc\s+tabulate/i)) {
+    return convertProcTabulate(trimmed, imports);
+  }
+
+  // DATA step
+  if (trimmed.match(/^data\s+/i)) {
+    return convertDataStep(trimmed, imports);
+  }
+
+  // Macro definition
+  if (trimmed.match(/^%macro\s+/i)) {
+    return convertMacro(trimmed, imports);
+  }
+
+  // Macro call
+  if (trimmed.match(/^%\w+/i)) {
+    return convertMacroCall(trimmed);
+  }
+
+  // Fallback: comment it
+  return trimmed.split('\n').map(l => '# ' + l).join('\n');
+}
+
+// ── Comment ──────────────────────────────────────────────────────────────
+
+function convertComment(block) {
+  let text = block.replace(/^\/\*\s*/, '').replace(/\s*\*\/\s*$/, '');
+  text = text.replace(/^\*\s*/, '').replace(/;\s*$/, '');
+  const lines = text.split('\n').map(l => l.trim());
+  if (lines.length === 1) return `# ${lines[0]}`;
+  return lines.map(l => `# ${l}`).join('\n');
+}
+
+// ── LIBNAME ──────────────────────────────────────────────────────────────
+
+function convertLibname(block) {
+  const m = block.match(/libname\s+(\w+)\s+["']([^"']+)["']/i);
+  if (m) {
+    return `# Library reference: ${m[1]}\n${m[1].toLowerCase()}_path = "${m[2]}"`;
+  }
+  return `# ${block.replace(/;/g, '').trim()}`;
+}
+
+// ── PROC FORMAT ──────────────────────────────────────────────────────────
+
+function convertProcFormat(block, imports) {
+  const lines = [];
+  lines.push('# Format definitions');
+
+  // Extract value statements
+  const valueBlocks = block.match(/value\s+\$?\w+[\s\S]*?(?=value\s|run\s*;|quit\s*;|\s*$)/gi) || [];
+
+  for (const vb of valueBlocks) {
+    const nameMatch = vb.match(/value\s+(\$?\w+)/i);
+    if (!nameMatch) continue;
+    let fmtName = nameMatch[1].replace(/^\$/, '');
+
+    // Extract mappings
+    const mappings = [];
+    const pairRegex = /['"]([^'"]*)['"]\s*=\s*['"]([^'"]*)['"]/g;
+    let pm;
+    while ((pm = pairRegex.exec(vb)) !== null) {
+      mappings.push([pm[1], pm[2]]);
+    }
+
+    // Also handle numeric ranges
+    const numRegex = /(\d+)\s*-\s*(\d+)\s*=\s*['"]([^'"]*)['"]/g;
+    const rangeMappings = [];
+    while ((pm = numRegex.exec(vb)) !== null) {
+      rangeMappings.push([parseInt(pm[1]), parseInt(pm[2]), pm[3]]);
+    }
+
+    // Handle low-N and N-high
+    const lowRegex = /low\s*-\s*(\d+)\s*=\s*['"]([^'"]*)['"]/gi;
+    while ((pm = lowRegex.exec(vb)) !== null) {
+      rangeMappings.push([null, parseInt(pm[1]), pm[2]]);
+    }
+    const highRegex = /(\d+)\s*-\s*high\s*=\s*['"]([^'"]*)['"]/gi;
+    while ((pm = highRegex.exec(vb)) !== null) {
+      rangeMappings.push([parseInt(pm[1]), null, pm[2]]);
+    }
+
+    // Check for 'other'
+    const otherMatch = vb.match(/other\s*=\s*['"]([^'"]*)['"]/i);
+
+    if (mappings.length > 0) {
+      lines.push(`\n${fmtName}_map = {`);
+      for (const [k, v] of mappings) {
+        lines.push(`    "${k}": "${v}",`);
+      }
+      lines.push(`}`);
+      if (otherMatch) {
+        lines.push(`# Default for unmatched values: "${otherMatch[1]}"`);
+        lines.push(`\ndef apply_${fmtName}(val):`);
+        lines.push(`    return ${fmtName}_map.get(val, "${otherMatch[1]}")`);
+      }
+    }
+
+    if (rangeMappings.length > 0) {
+      lines.push(`\ndef apply_${fmtName}(val):`);
+      for (const [lo, hi, label] of rangeMappings) {
+        if (lo === null) {
+          lines.push(`    if val <= ${hi}: return "${label}"`);
+        } else if (hi === null) {
+          lines.push(`    if val >= ${lo}: return "${label}"`);
+        } else {
+          lines.push(`    if ${lo} <= val <= ${hi}: return "${label}"`);
+        }
+      }
+      if (otherMatch) {
+        lines.push(`    return "${otherMatch[1]}"`);
+      } else {
+        lines.push(`    return str(val)`);
+      }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+// ── PROC SQL ─────────────────────────────────────────────────────────────
+
+function convertProcSQL(block, imports) {
+  const lines = [];
+  // Remove proc sql; and quit;
+  let body = block.replace(/proc\s+sql\s*;/i, '').replace(/quit\s*;/i, '').trim();
+
+  // Split into statements by semicolons (respecting quotes)
+  const stmts = splitStatements(body);
+
+  for (const stmt of stmts) {
+    const trimStmt = stmt.trim();
+    if (!trimStmt) continue;
+
+    const createMatch = trimStmt.match(/create\s+table\s+([\w.]+)\s+as\s+([\s\S]+)/i);
+    if (createMatch) {
+      const tableName = dsName(createMatch[1]);
+      const query = cleanSQL(createMatch[2]);
+      lines.push(`# SQL: create ${tableName}`);
+      lines.push(`${tableName} = pd.read_sql_query("""`);
+      lines.push(`    ${query}`);
+      lines.push(`""", connection)  # TODO: define connection`);
+      lines.push('');
+      lines.push(`# Alternative using pandas operations:`);
+      lines.push(convertSQLToPandas(query, tableName));
+    } else if (trimStmt.match(/^select\b/i)) {
+      lines.push(`result = pd.read_sql_query("""`);
+      lines.push(`    ${cleanSQL(trimStmt)}`);
+      lines.push(`""", connection)  # TODO: define connection`);
+    } else {
+      lines.push(`# ${trimStmt}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function convertSQLToPandas(sql, outName) {
+  const lines = [];
+  const fromMatch = sql.match(/from\s+([\w.]+)(?:\s+(?:as\s+)?(\w+))?/i);
+  const joinMatch = sql.match(/(?:inner|left|right|full|outer)?\s*join\s+([\w.]+)(?:\s+(?:as\s+)?(\w+))?\s+on\s+(.+?)(?=where|group|having|order|$)/is);
+  const whereMatch = sql.match(/where\s+(.+?)(?=group|having|order|$)/is);
+  const groupMatch = sql.match(/group\s+by\s+(.+?)(?=having|order|$)/is);
+  const orderMatch = sql.match(/order\s+by\s+(.+?)$/is);
+
+  if (!fromMatch) return `# Could not parse SQL to pandas`;
+
+  const srcTable = dsName(fromMatch[1]);
+  const srcAlias = fromMatch[2] || '';
+
+  if (joinMatch) {
+    const joinTable = dsName(joinMatch[1]);
+    const joinAlias = joinMatch[2] || '';
+    const onClause = joinMatch[3].trim();
+    // Parse ON clause
+    const onMatch = onClause.match(/(\w+)\.(\w+)\s*=\s*(\w+)\.(\w+)/);
+    if (onMatch) {
+      const lkey = onMatch[2];
+      const rkey = onMatch[4];
+      lines.push(`${outName} = pd.merge(${srcTable}, ${joinTable}, left_on="${lkey}", right_on="${rkey}", how="inner")`);
+    } else {
+      lines.push(`${outName} = pd.merge(${srcTable}, ${joinTable}, ...)  # TODO: parse ON clause`);
+    }
+  } else {
+    lines.push(`${outName} = ${srcTable}.copy()`);
+  }
+
+  if (whereMatch) {
+    const cond = convertSQLWhere(whereMatch[1].trim(), srcAlias);
+    lines.push(`${outName} = ${outName}.query("${cond}")`);
+  }
+
+  if (groupMatch) {
+    const groupCols = groupMatch[1].split(',').map(c => c.trim().replace(/\w+\./, ''));
+    lines.push(`${outName} = ${outName}.groupby(${JSON.stringify(groupCols)}).agg(...)  # TODO: aggregation`);
+  }
+
+  if (orderMatch) {
+    const orderCols = orderMatch[1].split(',').map(c => {
+      const parts = c.trim().split(/\s+/);
+      return { col: parts[0].replace(/\w+\./, ''), asc: !(parts[1] && parts[1].match(/desc/i)) };
+    });
+    const cols = orderCols.map(o => `"${o.col}"`);
+    const ascs = orderCols.map(o => o.asc);
+    lines.push(`${outName} = ${outName}.sort_values([${cols.join(', ')}], ascending=[${ascs.join(', ')}])`);
+  }
+
+  return lines.join('\n');
+}
+
+function convertSQLWhere(clause, alias) {
+  let c = clause;
+  if (alias) c = c.replace(new RegExp(alias + '\\.', 'g'), '');
+  c = c.replace(/'/g, '"');
+  return c;
+}
+
+function cleanSQL(sql) {
+  return sql.replace(/\n/g, '\n    ').replace(/;\s*$/, '').trim();
+}
+
+// ── PROC MEANS ───────────────────────────────────────────────────────────
+
+function convertProcMeans(block, imports) {
+  const lines = [];
+  const dataMatch = block.match(/data\s*=\s*([\w.]+)/i);
+  const classMatch = block.match(/class\s+([^;]+);/i);
+  const varMatch = block.match(/var\s+([^;]+);/i);
+  const outMatch = block.match(/output\s+out\s*=\s*([\w.]+)/i);
+  const statsMatch = block.match(/proc\s+(?:means|summary)\s+data\s*=\s*[\w.]+\s+([^;]*);/i);
+
+  const ds = dataMatch ? dsName(dataMatch[1]) : 'df';
+  const vars = varMatch ? varMatch[1].trim().split(/\s+/) : [];
+  const classVars = classMatch ? classMatch[1].trim().split(/\s+/) : [];
+  const outDs = outMatch ? dsName(outMatch[1]) : null;
+
+  // Parse requested statistics
+  let stats = ['count', 'mean', 'std', 'min', 'max'];
+  if (statsMatch) {
+    const reqStats = statsMatch[1].trim().toLowerCase().split(/\s+/);
+    const statMap = { n: 'count', mean: 'mean', std: 'std', min: 'min', max: 'max', median: 'median', sum: 'sum', var: 'var', range: 'range' };
+    const mapped = reqStats.map(s => statMap[s]).filter(Boolean);
+    if (mapped.length > 0) stats = mapped;
+  }
+
+  const varList = vars.length > 0 ? `[${vars.map(v => `"${v}"`).join(', ')}]` : '';
+
+  if (classVars.length > 0) {
+    const groupCols = classVars.map(v => `"${v}"`).join(', ');
+    const aggFuncs = stats.map(s => `"${s}"`).join(', ');
+    if (vars.length > 0) {
+      lines.push(`# PROC MEANS/SUMMARY with CLASS variables`);
+      lines.push(`${outDs || 'stats'} = ${ds}.groupby([${groupCols}])${varList.length ? `[${varList}]` : ''}.agg([${aggFuncs}])`);
+      if (outDs) lines.push(`${outDs} = ${outDs}.reset_index()`);
+    } else {
+      lines.push(`${outDs || 'stats'} = ${ds}.groupby([${groupCols}]).describe()`);
+    }
+  } else {
+    if (vars.length > 0) {
+      lines.push(`# Descriptive statistics`);
+      lines.push(`${outDs || 'stats'} = ${ds}[${varList}].agg([${stats.map(s => `"${s}"`).join(', ')}])`);
+    } else {
+      lines.push(`${outDs || 'stats'} = ${ds}.describe()`);
+    }
+  }
+
+  lines.push(`print(${outDs || 'stats'})`);
+  return lines.join('\n');
+}
+
+// ── PROC FREQ ────────────────────────────────────────────────────────────
+
+function convertProcFreq(block, imports) {
+  const lines = [];
+  const dataMatch = block.match(/data\s*=\s*([\w.]+)/i);
+  const ds = dataMatch ? dsName(dataMatch[1]) : 'df';
+
+  // Extract tables statements (include options after /)
+  const tablesMatches = block.match(/tables?\s+([^;]+)/gi) || [];
+
+  for (const tm of tablesMatches) {
+    const tabExpr = tm.replace(/tables?\s+/i, '').trim().split('/')[0].trim();
+    const options = tm.split('/')[1] || '';
+    const hasChisq = options.match(/chisq/i);
+
+    if (tabExpr.includes('*')) {
+      // Crosstab
+      const [var1, var2] = tabExpr.split('*').map(v => v.trim());
+      lines.push(`# Crosstab: ${var1} x ${var2}`);
+      lines.push(`ct_${var1}_${var2} = pd.crosstab(${ds}["${var1}"], ${ds}["${var2}"], margins=True)`);
+      lines.push(`print(ct_${var1}_${var2})`);
+      if (hasChisq) {
+        imports.add('from scipy.stats import chi2_contingency');
+        lines.push(`chi2, p_value, dof, expected = chi2_contingency(pd.crosstab(${ds}["${var1}"], ${ds}["${var2}"]))`);
+        lines.push(`print(f"Chi-square: {chi2:.4f}, p-value: {p_value:.4f}, df: {dof}")`);
+      }
+    } else {
+      // Frequency table
+      const vars = tabExpr.split(/\s+/);
+      for (const v of vars) {
+        lines.push(`# Frequency: ${v}`);
+        lines.push(`freq_${v} = ${ds}["${v}"].value_counts()`);
+        lines.push(`print(freq_${v})`);
+      }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+// ── PROC SORT ────────────────────────────────────────────────────────────
+
+function convertProcSort(block, imports) {
+  const dataMatch = block.match(/data\s*=\s*([\w.]+)/i);
+  const outMatch = block.match(/out\s*=\s*([\w.]+)/i);
+  const byMatch = block.match(/by\s+([^;]+);/i);
+  const nodupMatch = block.match(/nodupkey|noduprecs/i);
+
+  const ds = dataMatch ? dsName(dataMatch[1]) : 'df';
+  const outDs = outMatch ? dsName(outMatch[1]) : ds;
+  const byVars = byMatch ? byMatch[1].trim().split(/\s+/) : [];
+
+  const cols = [];
+  const ascending = [];
+  for (const v of byVars) {
+    if (v.toLowerCase() === 'descending') {
+      // next var is descending
+      continue;
+    }
+    const isDesc = byVars[byVars.indexOf(v) - 1]?.toLowerCase() === 'descending';
+    cols.push(`"${v}"`);
+    ascending.push(!isDesc);
+  }
+
+  const lines = [];
+  lines.push(`${outDs} = ${ds}.sort_values([${cols.join(', ')}], ascending=[${ascending.join(', ')}])`);
+
+  if (nodupMatch) {
+    lines.push(`${outDs} = ${outDs}.drop_duplicates(subset=[${cols.join(', ')}], keep="first")`);
+  }
+
+  lines.push(`${outDs} = ${outDs}.reset_index(drop=True)`);
+  return lines.join('\n');
+}
+
+// ── PROC PRINT ───────────────────────────────────────────────────────────
+
+function convertProcPrint(block, imports) {
+  const dataMatch = block.match(/data\s*=\s*([\w.]+)/i);
+  const obsMatch = block.match(/\bobs\s*=\s*(\d+)/i);
+  const varMatch = block.match(/var\s+([^;]+);/i);
+
+  const ds = dataMatch ? dsName(dataMatch[1]) : 'df';
+  const n = obsMatch ? obsMatch[1] : null;
+  const vars = varMatch ? varMatch[1].trim().split(/\s+/) : null;
+
+  let expr = ds;
+  if (vars) expr += `[${JSON.stringify(vars)}]`;
+  if (n) expr += `.head(${n})`;
+
+  return `print(${expr})`;
+}
+
+// ── PROC IMPORT ──────────────────────────────────────────────────────────
+
+function convertProcImport(block, imports) {
+  const fileMatch = block.match(/datafile\s*=\s*["']([^"']+)["']/i);
+  const outMatch = block.match(/out\s*=\s*([\w.]+)/i);
+  const dbmsMatch = block.match(/dbms\s*=\s*(\w+)/i);
+  const sheetMatch = block.match(/sheet\s*=\s*["']?([^"';\s]+)/i);
+  const delimMatch = block.match(/delimiter\s*=\s*["']([^"']+)["']/i);
+  const getnames = block.match(/getnames\s*=\s*(\w+)/i);
+  const guessingrows = block.match(/guessingrows\s*=\s*(\w+)/i);
+
+  const filePath = fileMatch ? fileMatch[1] : 'input_file';
+  const outDs = outMatch ? dsName(outMatch[1]) : 'df';
+  const dbms = dbmsMatch ? dbmsMatch[1].toLowerCase() : 'csv';
+
+  const lines = [];
+
+  if (dbms === 'csv' || dbms === 'dlm' || dbms === 'tab') {
+    const sep = dbms === 'tab' ? '\\t' : (delimMatch ? delimMatch[1] : ',');
+    const hasHeader = getnames ? getnames[1].toLowerCase() !== 'no' : true;
+    lines.push(`${outDs} = pd.read_csv("${filePath}", sep="${sep}", header=${hasHeader ? '0' : 'None'})`);
+  } else if (dbms === 'xlsx' || dbms === 'xls' || dbms === 'excel') {
+    const sheet = sheetMatch ? `, sheet_name="${sheetMatch[1]}"` : '';
+    lines.push(`${outDs} = pd.read_excel("${filePath}"${sheet})`);
+  } else if (dbms === 'sas7bdat') {
+    lines.push(`${outDs} = pd.read_sas("${filePath}", format="sas7bdat")`);
+  } else {
+    lines.push(`${outDs} = pd.read_csv("${filePath}")  # Adjust reader for ${dbms}`);
+  }
+
+  return lines.join('\n');
+}
+
+// ── PROC EXPORT ──────────────────────────────────────────────────────────
+
+function convertProcExport(block, imports) {
+  const dataMatch = block.match(/data\s*=\s*([\w.]+)/i);
+  const fileMatch = block.match(/outfile\s*=\s*["']([^"']+)["']/i);
+  const dbmsMatch = block.match(/dbms\s*=\s*(\w+)/i);
+  const sheetMatch = block.match(/sheet\s*=\s*["']?([^"';\s]+)/i);
+
+  const ds = dataMatch ? dsName(dataMatch[1]) : 'df';
+  const filePath = fileMatch ? fileMatch[1] : 'output_file';
+  const dbms = dbmsMatch ? dbmsMatch[1].toLowerCase() : 'csv';
+
+  if (dbms === 'csv' || dbms === 'dlm' || dbms === 'tab') {
+    return `${ds}.to_csv("${filePath}", index=False)`;
+  } else if (dbms === 'xlsx' || dbms === 'xls' || dbms === 'excel') {
+    const sheet = sheetMatch ? `, sheet_name="${sheetMatch[1]}"` : '';
+    return `${ds}.to_excel("${filePath}", index=False${sheet})`;
+  }
+  return `${ds}.to_csv("${filePath}", index=False)  # Adjust for ${dbms}`;
+}
+
+// ── PROC TRANSPOSE ───────────────────────────────────────────────────────
+
+function convertProcTranspose(block, imports) {
+  const dataMatch = block.match(/data\s*=\s*([\w.]+)/i);
+  const outMatch = block.match(/out\s*=\s*([\w.]+)/i);
+  const byMatch = block.match(/by\s+([^;]+);/i);
+  const idMatch = block.match(/id\s+([^;]+);/i);
+  const varMatch = block.match(/var\s+([^;]+);/i);
+  const prefixMatch = block.match(/prefix\s*=\s*(\w+)/i);
+  const renameMatch = block.match(/rename\s*=\s*\(([^)]+)\)/i);
+
+  const ds = dataMatch ? dsName(dataMatch[1]) : 'df';
+  const outDs = outMatch ? dsName(outMatch[1]) : 'transposed';
+  const byVars = byMatch ? byMatch[1].trim().split(/\s+/) : [];
+  const idVars = idMatch ? idMatch[1].trim().split(/\s+/) : [];
+  const valVars = varMatch ? varMatch[1].trim().split(/\s+/) : [];
+
+  const lines = [];
+
+  if (idVars.length > 0 && byVars.length > 0 && valVars.length > 0) {
+    // Wide: pivot_table
+    const idx = byVars.map(v => `"${v}"`).join(', ');
+    const col = idVars.map(v => `"${v}"`).join(', ');
+    const val = valVars.map(v => `"${v}"`).join(', ');
+    lines.push(`# Transpose (pivot)`);
+    lines.push(`${outDs} = ${ds}.pivot_table(index=[${idx}], columns=${col.includes(',') ? `[${col}]` : col}, values=[${val}], aggfunc="first")`);
+    lines.push(`${outDs}.columns = [f"${prefixMatch ? prefixMatch[1] : ''}{c}" for c in ${outDs}.columns.get_level_values(-1)]`);
+    lines.push(`${outDs} = ${outDs}.reset_index()`);
+  } else if (byVars.length > 0 && valVars.length > 0 && idVars.length === 0) {
+    // Long: melt
+    lines.push(`# Transpose (melt to long)`);
+    const ids = byVars.map(v => `"${v}"`).join(', ');
+    const vals = valVars.map(v => `"${v}"`).join(', ');
+    lines.push(`${outDs} = ${ds}.melt(id_vars=[${ids}], value_vars=[${vals}])`);
+  } else {
+    lines.push(`# Transpose`);
+    lines.push(`${outDs} = ${ds}.T`);
+  }
+
+  // Handle rename
+  if (renameMatch) {
+    const renames = {};
+    const renamePairs = renameMatch[1].match(/(\w+)\s*=\s*(\w+)/g) || [];
+    for (const rp of renamePairs) {
+      const [old, nw] = rp.split('=').map(s => s.trim());
+      renames[old] = nw;
+    }
+    if (Object.keys(renames).length > 0) {
+      lines.push(`${outDs} = ${outDs}.rename(columns=${JSON.stringify(renames)})`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+// ── PROC REG ─────────────────────────────────────────────────────────────
+
+function convertProcReg(block, imports) {
+  const dataMatch = block.match(/data\s*=\s*([\w.]+)/i);
+  const modelMatch = block.match(/model\s+(\w+)\s*=\s*([^;\/]+)/i);
+  const outMatch = block.match(/output\s+out\s*=\s*([\w.]+)/i);
+  const predMatch = block.match(/predicted\s*=\s*(\w+)/i);
+  const residMatch = block.match(/residual\s*=\s*(\w+)/i);
+  const vifMatch = block.match(/\bvif\b/i);
+
+  const ds = dataMatch ? dsName(dataMatch[1]) : 'df';
+  const lines = [];
+
+  if (modelMatch) {
+    const depVar = modelMatch[1];
+    const indepVars = modelMatch[2].trim().split(/\s+/).filter(v => v && v !== '/');
+
+    lines.push(`# Linear regression`);
+    const formula = `"${depVar} ~ ${indepVars.join(' + ')}"`;
+    lines.push(`model = smf.ols(${formula}, data=${ds}).fit()`);
+    lines.push(`print(model.summary())`);
+
+    if (vifMatch) {
+      imports.add('from statsmodels.stats.outliers_influence import variance_inflation_factor');
+      lines.push('');
+      lines.push('# VIF');
+      lines.push(`X = ${ds}[${JSON.stringify(indepVars)}]`);
+      lines.push(`X = sm.add_constant(X)`);
+      lines.push(`vif_data = pd.DataFrame({`);
+      lines.push(`    "variable": X.columns,`);
+      lines.push(`    "VIF": [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]`);
+      lines.push(`})`);
+      lines.push(`print(vif_data)`);
+    }
+
+    if (outMatch) {
+      const outDs = dsName(outMatch[1]);
+      lines.push('');
+      lines.push(`${outDs} = ${ds}.copy()`);
+      if (predMatch) lines.push(`${outDs}["${predMatch[1]}"] = model.predict(${ds})`);
+      if (residMatch) lines.push(`${outDs}["${residMatch[1]}"] = model.resid`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+// ── PROC LOGISTIC ────────────────────────────────────────────────────────
+
+function convertProcLogistic(block, imports) {
+  const dataMatch = block.match(/data\s*=\s*([\w.]+)/i);
+  const modelMatch = block.match(/model\s+(\w+)\s*=\s*([^;\/]+)/i);
+  const classMatch = block.match(/class\s+([^;\/]+)/i);
+  const outMatch = block.match(/output\s+out\s*=\s*([\w.]+)/i);
+  const predMatch = block.match(/predicted\s*=\s*(\w+)/i);
+  const descending = block.match(/descending/i);
+
+  const ds = dataMatch ? dsName(dataMatch[1]) : 'df';
+  const lines = [];
+
+  if (modelMatch) {
+    const depVar = modelMatch[1];
+    let indepVars = modelMatch[2].trim().split(/\s+/).filter(v => v && v !== '/');
+
+    // Parse class variables
+    const classVars = [];
+    if (classMatch) {
+      const classText = classMatch[1].split('/')[0].trim();
+      const cvars = classText.match(/(\w+)/g) || [];
+      classVars.push(...cvars.filter(v => v.toLowerCase() !== 'param' && v.toLowerCase() !== 'ref'));
+    }
+
+    lines.push(`# Logistic regression`);
+
+    // Build formula with C() for class vars
+    const terms = indepVars.map(v => classVars.includes(v) ? `C(${v})` : v);
+    const formula = `"${depVar} ~ ${terms.join(' + ')}"`;
+
+    lines.push(`model = smf.logit(${formula}, data=${ds}).fit()`);
+    lines.push(`print(model.summary())`);
+
+    if (outMatch) {
+      const outDs = dsName(outMatch[1]);
+      lines.push('');
+      lines.push(`${outDs} = ${ds}.copy()`);
+      if (predMatch) lines.push(`${outDs}["${predMatch[1]}"] = model.predict(${ds})`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+// ── PROC CONTENTS ────────────────────────────────────────────────────────
+
+function convertProcContents(block, imports) {
+  const dataMatch = block.match(/data\s*=\s*([\w.]+)/i);
+  const ds = dataMatch ? dsName(dataMatch[1]) : 'df';
+  const lines = [];
+  lines.push(`# Dataset metadata`);
+  lines.push(`print(${ds}.info())`);
+  lines.push(`print(${ds}.dtypes)`);
+  lines.push(`print(f"Rows: {len(${ds})}, Columns: {len(${ds}.columns)}")`);
+  lines.push(`print(${ds}.columns.tolist())`);
+  return lines.join('\n');
+}
+
+// ── PROC DATASETS ────────────────────────────────────────────────────────
+
+function convertProcDatasets(block, imports) {
+  const lines = [];
+  const stmts = splitStatements(block);
+
+  for (const stmt of stmts) {
+    const t = stmt.trim();
+    const tl = t.toLowerCase();
+    if (tl.match(/^proc\s+datasets/) || tl === 'run' || tl === 'quit') continue;
+
+    // DELETE
+    const delMatch = t.match(/^delete\s+(.+)/i);
+    if (delMatch) {
+      const datasets = delMatch[1].trim().split(/\s+/);
+      for (const d of datasets) {
+        lines.push(`del ${dsName(d)}  # delete dataset`);
+      }
+      continue;
+    }
+
+    // CHANGE (rename dataset)
+    const changeMatch = t.match(/^change\s+(\w+)\s*=\s*(\w+)/i);
+    if (changeMatch) {
+      lines.push(`${changeMatch[2]} = ${changeMatch[1]}  # rename dataset`);
+      lines.push(`del ${changeMatch[1]}`);
+      continue;
+    }
+
+    // MODIFY
+    const modMatch = t.match(/^modify\s+(\w+)/i);
+    if (modMatch) {
+      lines.push(`# Modify dataset: ${modMatch[1]}`);
+      continue;
+    }
+
+    // RENAME (inside modify)
+    const renMatch = t.match(/^rename\s+(\w+)\s*=\s*(\w+)/i);
+    if (renMatch) {
+      lines.push(`# ${renMatch[0]} → use df.rename(columns={"${renMatch[1]}": "${renMatch[2]}"})`);
+      continue;
+    }
+
+    // LABEL
+    const labMatch = t.match(/^label\s+/i);
+    if (labMatch) {
+      lines.push(`# ${t}  # pandas has no native label support`);
+      continue;
+    }
+
+    if (t) lines.push(`# ${t}`);
+  }
+
+  return lines.join('\n') || '# PROC DATASETS (no actionable statements)';
+}
+
+// ── PROC TABULATE ────────────────────────────────────────────────────────
+
+function convertProcTabulate(block, imports) {
+  const lines = [];
+  const dataMatch = block.match(/data\s*=\s*([\w.]+)/i);
+  const classMatch = block.match(/class\s+([^;]+);/i);
+  const varMatch = block.match(/var\s+([^;]+);/i);
+  const tableMatch = block.match(/table\s+([^;]+);/i);
+
+  const ds = dataMatch ? dsName(dataMatch[1]) : 'df';
+  const classVars = classMatch ? classMatch[1].trim().split(/\s+/) : [];
+  const analysisVars = varMatch ? varMatch[1].trim().split(/\s+/) : [];
+
+  lines.push(`# PROC TABULATE equivalent`);
+
+  if (tableMatch) {
+    const tableExpr = tableMatch[1].trim();
+    // Parse table dimension spec: row * column * page
+    const dims = tableExpr.split('*').map(d => d.trim());
+
+    if (classVars.length > 0 && analysisVars.length > 0) {
+      const idx = classVars.map(v => `"${v}"`).join(', ');
+      const vals = analysisVars.map(v => `"${v}"`).join(', ');
+      lines.push(`tabulate_result = ${ds}.pivot_table(`);
+      lines.push(`    index=[${idx}],`);
+      lines.push(`    values=[${vals}],`);
+      lines.push(`    aggfunc=["mean", "sum", "count"]`);
+      lines.push(`)`);
+    } else if (classVars.length > 0) {
+      lines.push(`tabulate_result = ${ds}.groupby([${classVars.map(v => `"${v}"`).join(', ')}]).describe()`);
+    } else {
+      lines.push(`tabulate_result = ${ds}.describe()`);
+    }
+  } else {
+    lines.push(`tabulate_result = ${ds}.describe()`);
+  }
+
+  lines.push(`print(tabulate_result)`);
+  return lines.join('\n');
+}
+
+// ── DATA Step ────────────────────────────────────────────────────────────
+
+function convertDataStep(block, imports) {
+  const lines = [];
+
+  // Parse DATA statement
+  const dataMatch = block.match(/^data\s+([\w.]+)\s*;/im);
+  const outDs = dataMatch ? dsName(dataMatch[1]) : 'df_out';
+
+  // Parse SET
+  const setMatch = block.match(/\bset\s+([\w.]+(?:\s*\(.*?\))?(?:\s+[\w.]+(?:\s*\(.*?\))?)*)\s*;/i);
+  // Parse MERGE
+  const mergeMatch = block.match(/\bmerge\s+([\s\S]*?)\s*;/i);
+  const byMatch = block.match(/\bby\s+([^;]+);/i);
+  // Parse WHERE (including WHERE ALSO)
+  const whereMatches = block.match(/\bwhere\s+(?:also\s+)?([^;]+);/gi) || [];
+  // Parse KEEP / DROP
+  const keepMatch = block.match(/\bkeep\s+([^;]+);/i);
+  const dropMatch = block.match(/\bdrop\s+([^;]+);/i);
+  // Parse RENAME
+  const renameMatch = block.match(/\brename\s+([^;]+);/i);
+  // Parse RETAIN
+  const retainMatches = block.match(/\bretain\s+([^;]+);/gi) || [];
+  // Parse ARRAY
+  const arrayMatches = block.match(/\barray\s+([^;]+);/gi) || [];
+  // Check for FIRST./LAST. usage
+  const hasFirstLast = block.match(/\b(first|last)\.\w+/i);
+
+  // Determine source
+  if (mergeMatch) {
+    lines.push(...convertMerge(mergeMatch[1], byMatch, outDs));
+  } else if (setMatch) {
+    const sources = setMatch[1].trim().split(/\s+(?=\w)/).filter(s => s.trim());
+    if (sources.length === 1) {
+      const src = sources[0].replace(/\(.*\)/, '').trim();
+      lines.push(`${outDs} = ${dsName(src)}.copy()`);
+    } else {
+      const dfs = sources.map(s => dsName(s.replace(/\(.*\)/, '').trim()));
+      lines.push(`${outDs} = pd.concat([${dfs.join(', ')}], ignore_index=True)`);
+    }
+  } else {
+    lines.push(`${outDs} = pd.DataFrame()`);
+  }
+
+  // WHERE clauses (supports multiple WHERE ALSO)
+  for (const wm of whereMatches) {
+    const condText = wm.replace(/\bwhere\s+(?:also\s+)?/i, '').replace(/;\s*$/, '').trim();
+    const cond = convertWhereClause(condText, outDs);
+    lines.push(cond);
+  }
+
+  // BY-group: generate FIRST./LAST. flags
+  if (byMatch && hasFirstLast) {
+    const byVars = byMatch[1].trim().split(/\s+/);
+    lines.push('');
+    lines.push(`# BY-group processing: FIRST./LAST. flags`);
+    for (const bv of byVars) {
+      lines.push(`${outDs}["_first_${bv}"] = ${outDs}["${bv}"] != ${outDs}["${bv}"].shift(1)`);
+      lines.push(`${outDs}["_last_${bv}"] = ${outDs}["${bv}"] != ${outDs}["${bv}"].shift(-1)`);
+    }
+  }
+
+  // RETAIN → cumsum/shift pattern
+  if (retainMatches.length > 0) {
+    lines.push('');
+    lines.push(`# RETAIN equivalent — stateful accumulation`);
+    for (const rm of retainMatches) {
+      const retainText = rm.replace(/\bretain\s+/i, '').replace(/;\s*$/, '').trim();
+      const parts = retainText.split(/\s+/);
+      const varName = parts[0];
+      const initVal = parts[1] || '0';
+      lines.push(`# retain ${varName} ${initVal} → see cumulative logic below`);
+    }
+  }
+
+  // ARRAY → column list
+  const arrayDefs = {};
+  if (arrayMatches.length > 0) {
+    lines.push('');
+    for (const am of arrayMatches) {
+      const arrText = am.replace(/\barray\s+/i, '').replace(/;\s*$/, '').trim();
+      const arrParsed = parseArrayDef(arrText);
+      if (arrParsed) {
+        arrayDefs[arrParsed.name] = arrParsed.columns;
+        lines.push(`${arrParsed.name}_cols = ${JSON.stringify(arrParsed.columns)}  # array ${arrParsed.name}`);
+      }
+    }
+  }
+
+  // Process body assignments and logic
+  const bodyLines = extractDataStepBody(block);
+  if (bodyLines.length > 0) {
+    lines.push('');
+    _lastIfConds = null;
+    for (const bl of bodyLines) {
+      const converted = convertDataStepLine(bl, outDs, imports, arrayDefs, byMatch);
+      if (converted) lines.push(converted);
+    }
+  }
+
+  // Clean up FIRST./LAST. helper columns
+  if (byMatch && hasFirstLast) {
+    const byVars = byMatch[1].trim().split(/\s+/);
+    const helperCols = byVars.flatMap(bv => [`"_first_${bv}"`, `"_last_${bv}"`]);
+    lines.push(`${outDs} = ${outDs}.drop(columns=[${helperCols.join(', ')}], errors="ignore")`);
+  }
+
+  // KEEP
+  if (keepMatch) {
+    const keepVars = keepMatch[1].trim().split(/\s+/);
+    lines.push(`${outDs} = ${outDs}[${JSON.stringify(keepVars)}]`);
+  }
+
+  // DROP
+  if (dropMatch) {
+    const dropVars = dropMatch[1].trim().split(/\s+/);
+    lines.push(`${outDs} = ${outDs}.drop(columns=${JSON.stringify(dropVars)}, errors="ignore")`);
+  }
+
+  // RENAME
+  if (renameMatch) {
+    const renameText = renameMatch[1].trim();
+    const pairs = renameText.match(/(\w+)\s*=\s*(\w+)/g) || [];
+    const renames = {};
+    for (const p of pairs) {
+      const [old, nw] = p.split('=').map(s => s.trim());
+      renames[old] = nw;
+    }
+    if (Object.keys(renames).length > 0) {
+      lines.push(`${outDs} = ${outDs}.rename(columns=${JSON.stringify(renames)})`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function parseArrayDef(text) {
+  // array scores{5} score1-score5;
+  // array x{*} a b c d;
+  const m = text.match(/^(\w+)\s*\{[^}]*\}\s+(.+)$/);
+  if (!m) return null;
+  const name = m[1];
+  const colSpec = m[2].trim();
+
+  // Range: score1-score5
+  const rangeMatch = colSpec.match(/^(\w+?)(\d+)\s*-\s*\1(\d+)$/);
+  if (rangeMatch) {
+    const prefix = rangeMatch[1];
+    const start = parseInt(rangeMatch[2]);
+    const end = parseInt(rangeMatch[3]);
+    const columns = [];
+    for (let i = start; i <= end; i++) columns.push(`${prefix}${i}`);
+    return { name, columns };
+  }
+
+  // Space-separated list
+  return { name, columns: colSpec.split(/\s+/) };
+}
+
+function convertWhereClause(condText, ds) {
+  let cond = condText;
+
+  // Handle BETWEEN x AND y
+  cond = cond.replace(/(\w+)\s+between\s+(\S+)\s+and\s+(\S+)/gi, '($1 >= $2) and ($1 <= $3)');
+
+  // Handle LIKE 'pattern'
+  cond = cond.replace(/(\w+)\s+like\s+['"]([^'"]+)['"]/gi, (m, col, pattern) => {
+    // Convert SQL LIKE pattern to pandas str method
+    if (pattern.startsWith('%') && pattern.endsWith('%')) {
+      return `${col}.str.contains("${pattern.slice(1, -1)}")`;
+    } else if (pattern.endsWith('%')) {
+      return `${col}.str.startswith("${pattern.slice(0, -1)}")`;
+    } else if (pattern.startsWith('%')) {
+      return `${col}.str.endswith("${pattern.slice(1)}")`;
+    }
+    return `${col}.str.match("${pattern.replace(/%/g, '.*').replace(/_/g, '.')}")`;
+  });
+
+  // Handle IN (val1, val2, ...) — both string and numeric
+  cond = cond.replace(/(\w+)\s+in\s*\(([^)]+)\)/gi, (m, col, vals) => {
+    const items = vals.split(',').map(v => v.trim());
+    return `${col}.isin([${items.join(', ')}])`;
+  });
+
+  // Handle NOT IN
+  cond = cond.replace(/(\w+)\s+not\s+in\s*\(([^)]+)\)/gi, (m, col, vals) => {
+    const items = vals.split(',').map(v => v.trim());
+    return `~${col}.isin([${items.join(', ')}])`;
+  });
+
+  // Standard condition conversion for .query()
+  cond = convertConditionQuery(cond);
+  return `${ds} = ${ds}.query("${cond}").copy()`;
+}
+
+function convertMerge(mergeText, byMatch, outDs) {
+  const lines = [];
+  // Extract datasets with IN= options
+  const dsRegex = /([\w.]+)\s*(?:\(([^)]*)\))?/g;
+  const datasets = [];
+  let dm;
+  while ((dm = dsRegex.exec(mergeText)) !== null) {
+    const dsN = dsName(dm[1]);
+    const opts = dm[2] || '';
+    const inMatch = opts.match(/in\s*=\s*(\w+)/i);
+    datasets.push({ name: dsN, inVar: inMatch ? inMatch[1] : null });
+  }
+
+  const byVars = byMatch ? byMatch[1].trim().split(/\s+/) : [];
+
+  if (datasets.length >= 2) {
+    const left = datasets[0];
+    const right = datasets[1];
+    const on = byVars.length > 0 ? `on=${JSON.stringify(byVars)}` : '';
+
+    // Determine join type from if a and b pattern
+    lines.push(`${outDs} = pd.merge(${left.name}, ${right.name}, ${on}, how="inner")`);
+  } else if (datasets.length === 1) {
+    lines.push(`${outDs} = ${datasets[0].name}.copy()`);
+  }
+
+  return lines;
+}
+
+function extractDataStepBody(block) {
+  // First normalize: split on semicolons into individual statements
+  const stmts = splitStatements(block);
+  const body = [];
+  let collecting = false;
+
+  for (const stmt of stmts) {
+    const t = stmt.trim();
+    const tl = t.toLowerCase();
+    if (tl.match(/^data\s+/)) { collecting = true; continue; }
+    if (tl.match(/^(run|quit)$/)) break;
+    if (tl.match(/^(set|merge|by|where|keep|drop|rename|length|format|informat|label|attrib|retain|array)\s+/)) continue;
+    if (collecting && t) {
+      body.push(t);
+    }
+  }
+  return body;
+}
+
+function convertDataStepLine(line, ds, imports, arrayDefs, byMatch) {
+  const trimmed = line.trim();
+  arrayDefs = arrayDefs || {};
+
+  // Skip empty or pure comment
+  if (!trimmed) return null;
+  if (trimmed.startsWith('/*') || trimmed.startsWith('*')) return '# ' + trimmed.replace(/\/\*|\*\/|\*/g, '').trim();
+
+  // SELECT/WHEN block detection
+  const selectMatch = trimmed.match(/^select\s*(?:\((\w+)\))?$/i);
+  if (selectMatch) {
+    _selectVar = selectMatch[1] || null;
+    _selectConds = [];
+    _selectVals = [];
+    _selectDefault = null;
+    _inSelect = true;
+    return null;
+  }
+  if (_inSelect) {
+    const whenMatch = trimmed.match(/^when\s*\(\s*([^)]+)\s*\)\s+(.+)$/i);
+    if (whenMatch) {
+      const whenVal = whenMatch[1].trim();
+      const action = convertAssignment(whenMatch[2], ds);
+      if (_selectVar) {
+        _selectConds.push(`${ds}["${_selectVar}"] == ${whenVal}`);
+      } else {
+        _selectConds.push(convertCondition(whenVal));
+      }
+      _selectVals.push(action);
+      return null;
+    }
+    const otherwiseMatch = trimmed.match(/^otherwise\s+(.+)$/i);
+    if (otherwiseMatch) {
+      _selectDefault = convertAssignment(otherwiseMatch[1], ds);
+      return null;
+    }
+    if (trimmed.match(/^end$/i)) {
+      _inSelect = false;
+      // Emit np.select
+      if (_selectConds.length > 0 && _selectVals.length > 0) {
+        imports.add('import numpy as np');
+        const lines = [];
+        // Extract target column from first assignment
+        const firstAssign = _selectVals[0];
+        if (firstAssign.includes('=')) {
+          const col = firstAssign.split('=')[0].trim();
+          lines.push(`# SELECT/WHEN → np.select`);
+          lines.push(`_conditions = [`);
+          for (const c of _selectConds) lines.push(`    ${c},`);
+          lines.push(`]`);
+          lines.push(`_choices = [`);
+          for (const v of _selectVals) {
+            const val = v.split('=')[1]?.trim() || v;
+            lines.push(`    ${val},`);
+          }
+          lines.push(`]`);
+          const defVal = _selectDefault ? _selectDefault.split('=')[1]?.trim() || '0' : '0';
+          lines.push(`${ds}["${col}"] = np.select(_conditions, _choices, default=${defVal})`);
+          return lines.join('\n');
+        }
+      }
+      return `# end select`;
+    }
+  }
+
+  // IF with IN operator: if x in ('a','b') then ...
+  const ifInMatch = trimmed.match(/^if\s+(\w+)\s+in\s*\(([^)]+)\)\s+then\s+(.+)$/i);
+  if (ifInMatch) {
+    const col = ifInMatch[1];
+    const vals = ifInMatch[2].split(',').map(v => v.trim());
+    const action = convertAssignment(ifInMatch[3], ds);
+    if (action.includes('=')) {
+      const [acol, aval] = action.split(' = ', 2);
+      const cond = `${ds}["${col}"].isin([${vals.join(', ')}])`;
+      _lastIfConds = [cond];
+      return `${ds}.loc[${cond}, "${acol.trim()}"] = ${aval}`;
+    }
+  }
+
+  // IF-THEN-ELSE
+  const ifThenElse = trimmed.match(/^if\s+(.+?)\s+then\s+(.+?)(?:\s*;\s*else\s+(.+))?$/i);
+  if (ifThenElse) {
+    const cond = convertConditionDS(ifThenElse[1], ds);
+    const thenPart = convertAssignment(ifThenElse[2], ds);
+    const elsePart = ifThenElse[3] ? convertAssignment(ifThenElse[3], ds) : null;
+
+    if (thenPart.includes('=')) {
+      const [col, val] = thenPart.split(' = ', 2);
+      _lastIfCol = col.trim();
+      _lastIfConds = [cond];
+      if (elsePart) {
+        const [_, elseVal] = elsePart.split(' = ', 2);
+        return `${ds}.loc[${cond}, "${col.trim()}"] = ${val}\n${ds}.loc[~(${cond}), "${col.trim()}"] = ${elseVal}`;
+      }
+      return `${ds}.loc[${cond}, "${col.trim()}"] = ${val}`;
+    }
+    // if ... then output
+    if (ifThenElse[2].trim().match(/^output\b/i)) {
+      return `# ${trimmed}  → filter: ${ds} = ${ds}[${cond}]`;
+    }
+    // if ... then delete
+    if (ifThenElse[2].trim().match(/^delete\b/i)) {
+      return `${ds} = ${ds}[~(${cond})]`;
+    }
+    return `# ${trimmed}`;
+  }
+
+  // ELSE IF
+  const elseIf = trimmed.match(/^else\s+if\s+(.+?)\s+then\s+(.+)$/i);
+  if (elseIf) {
+    const cond = convertConditionDS(elseIf[1], ds);
+    const thenPart = convertAssignment(elseIf[2], ds);
+    if (thenPart.includes('=')) {
+      const [col, val] = thenPart.split(' = ', 2);
+      if (_lastIfConds) _lastIfConds.push(cond);
+      return `${ds}.loc[${cond}, "${col.trim()}"] = ${val}`;
+    }
+  }
+
+  // ELSE (bare)
+  const elseLine = trimmed.match(/^else\s+(.+)$/i);
+  if (elseLine) {
+    const part = convertAssignment(elseLine[1], ds);
+    if (part.includes('=')) {
+      const [col, val] = part.split(' = ', 2);
+      if (_lastIfConds && _lastIfConds.length > 0) {
+        const negated = _lastIfConds.map(c => `~(${c})`).join(' & ');
+        _lastIfConds = null;
+        return `${ds}.loc[${negated}, "${col.trim()}"] = ${val}`;
+      }
+      return `${ds}.loc[:, "${col.trim()}"] = ${val}  # else fallback`;
+    }
+  }
+
+  // FIRST./LAST. references in conditions
+  const firstLastIf = trimmed.match(/^if\s+(first|last)\.(\w+)\s+then\s+(.+)$/i);
+  if (firstLastIf) {
+    const fl = firstLastIf[1].toLowerCase();
+    const byVar = firstLastIf[2];
+    const action = firstLastIf[3].trim();
+    const flag = `${ds}["_${fl}_${byVar}"]`;
+
+    if (action.match(/^output\b/i)) {
+      return `# Keep only ${fl} observation per ${byVar}\n${ds} = ${ds}[${flag}].copy()`;
+    }
+    const assignM = action.match(/^(\w+)\s*=\s*(.+)/);
+    if (assignM) {
+      return `${ds}.loc[${flag}, "${assignM[1]}"] = ${convertExpressionSimple(assignM[2])}`;
+    }
+    return `# ${trimmed}`;
+  }
+
+  // OUTPUT to specific dataset
+  const outputDsMatch = trimmed.match(/^output\s+([\w.]+)/i);
+  if (outputDsMatch) {
+    const targetDs = dsName(outputDsMatch[1]);
+    return `# output → ${targetDs}  (conditional append to ${targetDs})`;
+  }
+
+  // OUTPUT (bare)
+  if (trimmed.match(/^output\s*$/i)) {
+    return `# output (row appended to output dataset)`;
+  }
+
+  // DELETE statement
+  if (trimmed.match(/^delete\s*$/i)) {
+    return `# delete (drop current observation)`;
+  }
+
+  // Simple assignment: var = expression;
+  const assignMatch = trimmed.match(/^(\w+)\s*=\s*(.+)$/);
+  if (assignMatch) {
+    const varName = assignMatch[1];
+    const expr = convertExpression(assignMatch[2], ds, imports);
+    return `${ds}["${varName}"] = ${expr}`;
+  }
+
+  // DO loops — iterative
+  const doMatch = trimmed.match(/^do\s+(\w+)\s*=\s*(.+?)\s+to\s+(.+?)(?:\s+by\s+(.+))?$/i);
+  if (doMatch) {
+    const ivar = doMatch[1];
+    const start = doMatch[2];
+    const end = doMatch[3];
+    const step = doMatch[4] || '1';
+    return `for ${ivar} in range(${start}, ${end} + 1, ${step}):`;
+  }
+
+  // DO WHILE
+  const doWhileMatch = trimmed.match(/^do\s+while\s*\((.+)\)$/i);
+  if (doWhileMatch) {
+    const cond = convertExpressionSimple(doWhileMatch[1]);
+    return `while ${cond}:`;
+  }
+
+  // DO UNTIL
+  const doUntilMatch = trimmed.match(/^do\s+until\s*\((.+)\)$/i);
+  if (doUntilMatch) {
+    const cond = convertExpressionSimple(doUntilMatch[1]);
+    return `while True:  # do until ${cond}\n    # ... loop body ...\n    if ${cond}: break`;
+  }
+
+  // DO (bare — begin block)
+  if (trimmed.match(/^do\s*$/i)) return `# do (begin block)`;
+
+  if (trimmed.match(/^end\s*$/i)) return '# end';
+
+  return `# ${trimmed}`;
+}
+
+// Convert condition for DATA step (handles FIRST./LAST., IN)
+function convertConditionDS(cond, ds) {
+  let c = cond.trim();
+
+  // Handle IN operator: var in ('a', 'b', 'c')
+  c = c.replace(/(\w+)\s+in\s*\(([^)]+)\)/gi, (m, col, vals) => {
+    const items = vals.split(',').map(v => v.trim());
+    return `${ds}["${col}"].isin([${items.join(', ')}])`;
+  });
+
+  // Handle NOT IN
+  c = c.replace(/(\w+)\s+not\s+in\s*\(([^)]+)\)/gi, (m, col, vals) => {
+    const items = vals.split(',').map(v => v.trim());
+    return `~${ds}["${col}"].isin([${items.join(', ')}])`;
+  });
+
+  // Handle FIRST./LAST.
+  c = c.replace(/\b(first|last)\.(\w+)/gi, (m, fl, v) => `${ds}["_${fl.toLowerCase()}_${v}"]`);
+
+  // Handle missing() / null check
+  c = c.replace(/\bmissing\s*\(\s*(\w+)\s*\)/gi, `${ds}["$1"].isna()`);
+
+  // Standard conversions
+  c = c.replace(/\beq\b/gi, '==');
+  c = c.replace(/\bne\b/gi, '!=');
+  c = c.replace(/\blt\b/gi, '<');
+  c = c.replace(/\ble\b/gi, '<=');
+  c = c.replace(/\bgt\b/gi, '>');
+  c = c.replace(/\bge\b/gi, '>=');
+  c = c.replace(/\band\b/gi, '&');
+  c = c.replace(/\bor\b/gi, '|');
+  c = c.replace(/\bnot\b/gi, '~');
+  c = c.replace(/["']([^"']+)["']/g, '"$1"');
+  // Handle = as comparison (SAS uses single =)
+  c = c.replace(/(?<![=!<>])=(?!=)/g, '==');
+
+  return c;
+}
+
+function convertAssignment(text, ds) {
+  const t = text.trim().replace(/;\s*$/, '');
+  const m = t.match(/^(\w+)\s*=\s*(.+)$/);
+  if (m) {
+    return `${m[1]} = ${convertExpressionSimple(m[2])}`;
+  }
+  return t;
+}
+
+function convertCondition(cond) {
+  let c = cond.trim();
+  // SAS comparison operators
+  c = c.replace(/\beq\b/gi, '==');
+  c = c.replace(/\bne\b/gi, '!=');
+  c = c.replace(/\blt\b/gi, '<');
+  c = c.replace(/\ble\b/gi, '<=');
+  c = c.replace(/\bgt\b/gi, '>');
+  c = c.replace(/\bge\b/gi, '>=');
+  c = c.replace(/\band\b/gi, '&');
+  c = c.replace(/\bor\b/gi, '|');
+  c = c.replace(/\bnot\b/gi, '~');
+  // SAS quoted strings
+  c = c.replace(/["']([^"']+)["']/g, '"$1"');
+  return c;
+}
+
+function convertConditionQuery(cond) {
+  let c = cond.trim();
+  c = c.replace(/\beq\b/gi, '==');
+  c = c.replace(/\bne\b/gi, '!=');
+  c = c.replace(/\blt\b/gi, '<');
+  c = c.replace(/\ble\b/gi, '<=');
+  c = c.replace(/\bgt\b/gi, '>');
+  c = c.replace(/\bge\b/gi, '>=');
+  c = c.replace(/\band\b/gi, 'and');
+  c = c.replace(/\bor\b/gi, 'or');
+  c = c.replace(/\bnot\b/gi, 'not');
+  c = c.replace(/["']([^"']+)["']/g, "'$1'");
+  return c;
+}
+
+function convertExpression(expr, ds, imports) {
+  let e = expr.trim().replace(/;\s*$/, '');
+
+  // SAS date literals: '01JAN2024'd → pd.Timestamp("2024-01-01")
+  e = e.replace(/'(\d{1,2})(\w{3})(\d{4})(?::(\d{2}):(\d{2})(?::(\d{2}))?)?'d[t]?/gi, (m, day, mon, yr, hh, mm, ss) => {
+    const months = {jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+    const mo = months[mon.toLowerCase()] || '01';
+    let ts = `${yr}-${mo}-${day.padStart(2,'0')}`;
+    if (hh) ts += ` ${hh}:${mm}${ss ? ':'+ss : ':00'}`;
+    return `pd.Timestamp("${ts}")`;
+  });
+
+  // SAS double-quote date literals: "01JAN2024"d
+  e = e.replace(/"(\d{1,2})(\w{3})(\d{4})"d/gi, (m, day, mon, yr) => {
+    const months = {jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+    const mo = months[mon.toLowerCase()] || '01';
+    return `pd.Timestamp("${yr}-${mo}-${day.padStart(2,'0')}")`;
+  });
+
+  // SAS string concatenation (||)
+  e = e.replace(/\|\|/g, '+');
+
+  // SAS exponentiation
+  e = e.replace(/\*\*/g, '**');
+
+  // SAS missing value (.) — only standalone dots, not decimals
+  e = e.replace(/(?<=\s|^|=|,)\s*\.\s*(?=\s|$|;|,|\))/g, ' None ');
+
+  // Convert SAS functions
+  e = convertFunctions(e, ds);
+
+  return e;
+}
+
+function convertExpressionSimple(expr) {
+  let e = expr.trim().replace(/;\s*$/, '');
+
+  // Date literals
+  e = e.replace(/'(\d{1,2})(\w{3})(\d{4})(?::(\d{2}):(\d{2})(?::(\d{2}))?)?'d[t]?/gi, (m, day, mon, yr, hh, mm, ss) => {
+    const months = {jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+    const mo = months[mon.toLowerCase()] || '01';
+    let ts = `${yr}-${mo}-${day.padStart(2,'0')}`;
+    if (hh) ts += ` ${hh}:${mm}${ss ? ':'+ss : ':00'}`;
+    return `pd.Timestamp("${ts}")`;
+  });
+
+  e = e.replace(/\|\|/g, '+');
+  e = e.replace(/\*\*/g, '**');
+  e = e.replace(/(?<=\s|^|=|,)\s*\.\s*(?=\s|$|;|,|\))/g, ' None ');
+  return e;
+}
+
+function convertFunctions(expr, ds) {
+  let result = expr;
+
+  // catx('sep', a, b, c) → 'sep'.join([str(a), str(b), str(c)])
+  result = result.replace(/catx\s*\(\s*(['"])([^'"]*)\1\s*,\s*([^)]+)\)/gi, (m, q, sep, args) => {
+    const parts = splitArgs(args).map(a => `str(${a.trim()})`);
+    return `"${sep}".join([${parts.join(', ')}])`;
+  });
+
+  // cats(a, b) → ''.join([str(a).strip() for a in [...]])
+  result = result.replace(/cats\s*\(\s*([^)]+)\)/gi, (m, args) => {
+    const parts = splitArgs(args).map(a => `str(${a.trim()}).strip()`);
+    return `"".join([${parts.join(', ')}])`;
+  });
+
+  // Simple function replacements
+  const simpleFns = [
+    [/\bstrip\s*\(\s*([^)]+)\)/gi, '$1.strip()'],
+    [/\btrim\s*\(\s*([^)]+)\)/gi, '$1.strip()'],
+    [/\bleft\s*\(\s*([^)]+)\)/gi, '$1.lstrip()'],
+    [/\bright\s*\(\s*([^)]+)\)/gi, '$1.rstrip()'],
+    [/\bupcase\s*\(\s*([^)]+)\)/gi, '$1.upper()'],
+    [/\blowcase\s*\(\s*([^)]+)\)/gi, '$1.lower()'],
+    [/\bpropcase\s*\(\s*([^)]+)\)/gi, '$1.title()'],
+    [/\blength\s*\(\s*([^)]+)\)/gi, 'len($1)'],
+    [/\babs\s*\(\s*([^)]+)\)/gi, 'abs($1)'],
+    [/\bceil\s*\(\s*([^)]+)\)/gi, 'math.ceil($1)'],
+    [/\bfloor\s*\(\s*([^)]+)\)/gi, 'math.floor($1)'],
+    [/\bsqrt\s*\(\s*([^)]+)\)/gi, 'math.sqrt($1)'],
+    [/\blog\s*\(\s*([^)]+)\)/gi, 'math.log($1)'],
+    [/\blog10\s*\(\s*([^)]+)\)/gi, 'math.log10($1)'],
+    [/\blog2\s*\(\s*([^)]+)\)/gi, 'math.log2($1)'],
+    [/\bexp\s*\(\s*([^)]+)\)/gi, 'math.exp($1)'],
+    [/\bint\s*\(\s*([^)]+)\)/gi, 'int($1)'],
+    [/\bround\s*\(\s*([^),]+)(?:,\s*([^)]+))?\)/gi, (m, v, d) => d ? `round(${v}, ${d})` : `round(${v})`],
+    [/\bmod\s*\(\s*([^,]+),\s*([^)]+)\)/gi, '$1 % $2'],
+    [/\bmax\s*\(\s*([^)]+)\)/gi, 'max($1)'],
+    [/\bmin\s*\(\s*([^)]+)\)/gi, 'min($1)'],
+    [/\bsum\s*\(\s*([^)]+)\)/gi, 'sum([$1])'],
+    [/\bmissing\s*\(\s*([^)]+)\)/gi, 'pd.isna($1)'],
+    [/\btranwrd\s*\(\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/gi, '$1.replace($2, $3)'],
+    [/\bindex\s*\(\s*([^,]+),\s*([^)]+)\)/gi, '$1.find($2)'],
+    [/\breverse\s*\(\s*([^)]+)\)/gi, '$1[::-1]'],
+    [/\byear\s*\(\s*([^)]+)\)/gi, '$1.dt.year'],
+    [/\bmonth\s*\(\s*([^)]+)\)/gi, '$1.dt.month'],
+    [/\bday\s*\(\s*([^)]+)\)/gi, '$1.dt.day'],
+    [/\bhour\s*\(\s*([^)]+)\)/gi, '$1.dt.hour'],
+    [/\bminute\s*\(\s*([^)]+)\)/gi, '$1.dt.minute'],
+    [/\bsecond\s*\(\s*([^)]+)\)/gi, '$1.dt.second'],
+    [/\bqtr\s*\(\s*([^)]+)\)/gi, '$1.dt.quarter'],
+    [/\bweekday\s*\(\s*([^)]+)\)/gi, '($1.dt.dayofweek + 1)'],
+    [/\bdatepart\s*\(\s*([^)]+)\)/gi, '$1.dt.normalize()'],
+    [/\btoday\s*\(\s*\)/gi, 'pd.Timestamp.now().normalize()'],
+    [/\bmdy\s*\(\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/gi, 'pd.Timestamp(year=int($3), month=int($1), day=int($2))'],
+    [/\binput\s*\(\s*([^,]+),\s*[^)]*(?:date|mmddyy|yymmdd)[^)]*\)/gi, 'pd.to_datetime($1)'],
+    [/\binput\s*\(\s*([^,]+),\s*[^)]*(?:best|comma|dollar)\d*\.[^)]*\)/gi, 'pd.to_numeric($1, errors="coerce")'],
+    [/\bput\s*\(\s*([^,]+),\s*[^)]+\)/gi, 'str($1)'],
+    [/\bn\s*\(\s*([^)]+)\)/gi, 'sum(pd.notna(x) for x in [$1])'],
+    [/\bnmiss\s*\(\s*([^)]+)\)/gi, 'sum(pd.isna(x) for x in [$1])'],
+    [/\bcoalesce\s*\(\s*([^)]+)\)/gi, 'next((x for x in [$1] if pd.notna(x)), None)'],
+    [/\branuni\s*\(\s*[^)]*\)/gi, 'random.random()'],
+    [/\brannor\s*\(\s*[^)]*\)/gi, 'random.gauss(0, 1)'],
+    [/\bscan\s*\(\s*([^,]+),\s*([^)]+)\)/gi, '$1.split()[$2 - 1]'],
+    [/\bcount\s*\(\s*([^,]+),\s*([^)]+)\)/gi, '$1.count($2)'],
+    [/\bverify\s*\(\s*([^,]+),\s*([^)]+)\)/gi, '# verify($1, $2) — manual check needed'],
+    [/\banyalpha\s*\(\s*([^)]+)\)/gi, 'any(c.isalpha() for c in $1)'],
+    [/\banydigit\s*\(\s*([^)]+)\)/gi, 'any(c.isdigit() for c in $1)'],
+  ];
+
+  for (const [pat, rep] of simpleFns) {
+    result = result.replace(pat, rep);
+  }
+
+  // intck('interval', start, end) → date difference
+  result = result.replace(/\bintck\s*\(\s*['"](\w+)['"]\s*,\s*([^,]+),\s*([^)]+)\)/gi, (m, interval, start, end) => {
+    const s = start.trim(), e = end.trim();
+    switch(interval.toLowerCase()) {
+      case 'day': return `(${e} - ${s}).dt.days`;
+      case 'month': return `((${e}.dt.year - ${s}.dt.year) * 12 + ${e}.dt.month - ${s}.dt.month)`;
+      case 'year': return `(${e}.dt.year - ${s}.dt.year)`;
+      case 'week': return `((${e} - ${s}).dt.days // 7)`;
+      case 'hour': return `((${e} - ${s}).dt.total_seconds() // 3600)`;
+      default: return `# intck('${interval}', ${s}, ${e}) — manual conversion needed`;
+    }
+  });
+
+  // intnx('interval', date, n, 'alignment') → date offset
+  result = result.replace(/\bintnx\s*\(\s*['"](\w+)['"]\s*,\s*([^,]+),\s*([^,)]+)(?:,\s*['"](\w+)['"])?\)/gi, (m, interval, date, n, align) => {
+    const d = date.trim(), num = n.trim();
+    switch(interval.toLowerCase()) {
+      case 'day': return `${d} + pd.DateOffset(days=${num})`;
+      case 'month': return `${d} + pd.DateOffset(months=${num})`;
+      case 'year': return `${d} + pd.DateOffset(years=${num})`;
+      case 'week': return `${d} + pd.DateOffset(weeks=${num})`;
+      case 'hour': return `${d} + pd.DateOffset(hours=${num})`;
+      default: return `${d} + pd.DateOffset(${interval.toLowerCase()}s=${num})`;
+    }
+  });
+
+  // Substr: substr(str, pos, len) → str[pos-1:pos-1+len]
+  result = result.replace(/\bsubstr\s*\(\s*([^,]+),\s*([^,]+)(?:,\s*([^)]+))?\)/gi, (m, s, pos, len) => {
+    if (len) return `${s.trim()}[${pos.trim()}-1:${pos.trim()}-1+${len.trim()}]`;
+    return `${s.trim()}[${pos.trim()}-1:]`;
+  });
+
+  return result;
+}
+
+// ── Macro Conversion ─────────────────────────────────────────────────────
+
+function convertMacro(block, imports) {
+  const lines = [];
+
+  // Parse macro header
+  const headerMatch = block.match(/%macro\s+(\w+)\s*(?:\(([^)]*)\))?\s*;/i);
+  if (!headerMatch) return `# Could not parse macro\n${block.split('\n').map(l => '# ' + l).join('\n')}`;
+
+  const macroName = headerMatch[1];
+  const params = headerMatch[2] || '';
+
+  // Parse parameters
+  const paramList = [];
+  if (params.trim()) {
+    const paramParts = params.split(',');
+    for (const p of paramParts) {
+      const pMatch = p.trim().match(/(\w+)\s*(?:=\s*(.*))?/);
+      if (pMatch) {
+        const pName = pMatch[1];
+        const pDefault = pMatch[2]?.trim() || null;
+        paramList.push({ name: pName, default: pDefault });
+      }
+    }
+  }
+
+  // Build function signature
+  const pyParams = paramList.map(p => {
+    if (p.default !== null) return `${p.name}=${isNaN(p.default) ? `"${p.default}"` : p.default}`;
+    return p.name;
+  }).join(', ');
+
+  lines.push(`def ${macroName}(${pyParams}):`);
+
+  // Process macro body
+  let body = block.replace(/%macro\s+\w+\s*(?:\([^)]*\))?\s*;/i, '')
+                  .replace(/%mend\s+\w*\s*;?/i, '').trim();
+
+  // Handle %do loops
+  body = body.replace(/%do\s+(\w+)\s*=\s*([^%]+?)%to\s+([^;]+);/gi, (m, ivar, start, end) => {
+    const s = start.trim().replace(/&/g, '');
+    const e = end.trim().replace(/&/g, '');
+    return `for ${ivar} in range(${s}, ${e} + 1):`;
+  });
+  body = body.replace(/%end\s*;/gi, '# end loop');
+
+  // Handle %let
+  body = body.replace(/%let\s+(\w+)\s*=\s*([^;]+);/gi, '$1 = "$2"');
+
+  // Handle %sysfunc
+  body = body.replace(/%sysfunc\s*\(\s*putn\s*\(\s*&(\w+)\s*,\s*z(\d+)\.\s*\)\s*\)/gi, 'str($1).zfill($2)');
+  body = body.replace(/%sysfunc\s*\(\s*([^)]+)\)/gi, '# sysfunc: $1');
+
+  // Replace macro variables
+  body = body.replace(/&(\w+)\.?/g, '{$1}');
+
+  // Convert embedded DATA/PROC steps
+  const innerBlocks = splitBlocks(body);
+  for (const ib of innerBlocks) {
+    const converted = convertBlock(ib, imports);
+    const indented = converted.split('\n').map(l => '    ' + l).join('\n');
+    lines.push(indented);
+  }
+
+  if (lines.length === 1) {
+    lines.push('    pass  # TODO: implement macro body');
+  }
+
+  return lines.join('\n');
+}
+
+function convertMacroCall(block) {
+  const m = block.match(/%(\w+)\s*(?:\(([^)]*)\))?\s*;?/);
+  if (!m) return `# ${block}`;
+
+  const name = m[1];
+  const args = m[2] || '';
+
+  // Parse keyword args
+  const pyArgs = [];
+  if (args.trim()) {
+    const parts = args.split(',');
+    for (const p of parts) {
+      const kv = p.trim().match(/(\w+)\s*=\s*(.+)/);
+      if (kv) {
+        const val = kv[2].trim();
+        pyArgs.push(`${kv[1]}=${isNaN(val) ? `"${val}"` : val}`);
+      } else {
+        pyArgs.push(p.trim());
+      }
+    }
+  }
+
+  return `${name}(${pyArgs.join(', ')})`;
+}
+
+// ── Utility ──────────────────────────────────────────────────────────────
+
+function dsName(name) {
+  // Convert work.something → something, lib.ds → lib_ds
+  if (!name) return 'df';
+  const n = name.trim().replace(/\(.*\)/, '').trim();
+  if (n.match(/^work\./i)) return n.replace(/^work\./i, '');
+  return n.replace(/\./g, '_');
+}
+
+function splitArgs(argStr) {
+  const args = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of argStr) {
+    if (ch === '(' || ch === '[') depth++;
+    else if (ch === ')' || ch === ']') depth--;
+    else if (ch === ',' && depth === 0) {
+      args.push(current);
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim()) args.push(current);
+  return args;
+}
+
+function splitStatements(code) {
+  const stmts = [];
+  let current = '';
+  let inStr = false;
+  let strChar = '';
+  for (let i = 0; i < code.length; i++) {
+    const ch = code[i];
+    if (inStr) {
+      current += ch;
+      if (ch === strChar) inStr = false;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      inStr = true;
+      strChar = ch;
+      current += ch;
+      continue;
+    }
+    if (ch === ';') {
+      if (current.trim()) stmts.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim()) stmts.push(current.trim());
+  return stmts;
+}
+
+// ── Syntax Highlighting ──────────────────────────────────────────────────
+
+function highlightPython(code) {
+  const esc = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  let result = esc;
+
+  // Comments
+  result = result.replace(/(#.*$)/gm, '<span class="com">$1</span>');
+
+  // Strings (triple-quoted first, then single/double)
+  result = result.replace(/("""[\s\S]*?"""|'''[\s\S]*?''')/g, '<span class="str">$1</span>');
+  result = result.replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, (m) => {
+    if (m.includes('class="')) return m; // already highlighted
+    return `<span class="str">${m}</span>`;
+  });
+
+  // Numbers
+  result = result.replace(/\b(\d+\.?\d*)\b/g, (m, n, offset) => {
+    // Check if inside a tag
+    const before = result.substring(Math.max(0, offset - 20), offset);
+    if (before.includes('class="')) return m;
+    return `<span class="num">${n}</span>`;
+  });
+
+  // Keywords
+  const kwds = ['import', 'from', 'as', 'def', 'class', 'return', 'if', 'elif', 'else', 'for', 'while', 'in', 'not', 'and', 'or', 'is', 'None', 'True', 'False', 'with', 'try', 'except', 'finally', 'raise', 'pass', 'break', 'continue', 'lambda', 'yield', 'assert', 'del', 'global', 'nonlocal', 'async', 'await'];
+  for (const kw of kwds) {
+    result = result.replace(new RegExp(`\\b(${kw})\\b`, 'g'), (m, w, offset) => {
+      const before = result.substring(Math.max(0, offset - 10), offset);
+      if (before.match(/class="/)) return m;
+      return `<span class="kw">${w}</span>`;
+    });
+  }
+
+  // Built-in functions
+  const builtins = ['print', 'len', 'range', 'str', 'int', 'float', 'list', 'dict', 'tuple', 'set', 'sum', 'max', 'min', 'abs', 'round', 'sorted', 'enumerate', 'zip', 'map', 'filter', 'type', 'isinstance', 'next', 'open', 'super'];
+  for (const fn of builtins) {
+    result = result.replace(new RegExp(`\\b(${fn})\\s*\\(`, 'g'), '<span class="fn">$1</span>(');
+  }
+
+  // pd / np / sm calls
+  result = result.replace(/\b(pd|np|sm|smf|math|random|statistics|re)\b/g, '<span class="fn">$1</span>');
+
+  return result;
+}
+
+// ── UI ───────────────────────────────────────────────────────────────────
+
+function copyOutput() {
+  const el = document.getElementById('pyOutput');
+  const text = el.innerText || el.textContent;
+  if (!text.trim()) { showToast('Nothing to copy'); return; }
+  navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard'));
+}
+
+function clearAll() {
+  document.getElementById('sasInput').value = '';
+  document.getElementById('pyOutput').innerHTML = '';
+  document.getElementById('status').textContent = '';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// Samples menu
+function toggleSamples() {
+  document.getElementById('sampleMenu').classList.toggle('open');
+}
+
+(function buildSampleMenu() {
+  const menu = document.getElementById('sampleMenu');
+  for (const [name, code] of Object.entries(SAMPLES)) {
+    const btn = document.createElement('button');
+    btn.textContent = name;
+    btn.onclick = () => {
+      document.getElementById('sasInput').value = code;
+      menu.classList.remove('open');
+      convert();
+    };
+    menu.appendChild(btn);
+  }
+})();
+
+// Close sample menu on outside click
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.sample-dropdown')) {
+    document.getElementById('sampleMenu').classList.remove('open');
+  }
+});
+
+// Keyboard shortcut: Ctrl+Enter to convert
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    convert();
+  }
+});
+
+// Tab key in textarea
+document.getElementById('sasInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const ta = e.target;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    ta.value = ta.value.substring(0, start) + '    ' + ta.value.substring(end);
+    ta.selectionStart = ta.selectionEnd = start + 4;
+  }
+});
+</script>
+
+</body>
+</html>
