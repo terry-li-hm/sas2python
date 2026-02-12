@@ -248,6 +248,75 @@
   }
   .sample-menu button:hover { background: var(--surface2); }
 
+  .tab-bar {
+    display: flex;
+    gap: 6px;
+    padding: 8px 12px;
+    background: rgba(0,0,0,0.25);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .tab-btn {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .tab-btn.active {
+    color: #fff;
+    background: var(--accent2);
+    border-color: var(--accent);
+  }
+
+  .mode-pane {
+    position: absolute;
+    inset: 0;
+    display: none;
+  }
+  .mode-pane.active { display: flex; }
+
+  .mode-project {
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 20px;
+    overflow: auto;
+  }
+
+  .drop-zone {
+    border: 2px dashed rgba(255,255,255,0.2);
+    border-radius: var(--radius);
+    padding: 24px;
+    text-align: center;
+    color: var(--text-dim);
+    background: rgba(255,255,255,0.03);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .drop-zone.dragover {
+    border-color: var(--accent);
+    color: #fff;
+    background: rgba(233,69,96,0.1);
+  }
+  .file-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    color: var(--text);
+  }
+  .file-list li {
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 6px;
+  }
+
   footer {
     padding: 8px 32px;
     font-size: 0.72rem;
@@ -271,8 +340,9 @@
 </header>
 
 <div class="toolbar">
-  <button class="btn-primary" onclick="convert()" title="Ctrl+Enter">Convert</button>
+  <button class="btn-primary" onclick="convertDispatcher()" title="Ctrl+Enter">Convert</button>
   <button class="btn-green" onclick="copyOutput()">Copy Python</button>
+  <button class="btn-secondary" onclick="downloadOutput()">Download .py</button>
   <button class="btn-secondary" onclick="clearAll()">Clear</button>
   <div class="sample-dropdown">
     <button class="btn-secondary" onclick="toggleSamples()">Load Sample</button>
@@ -285,8 +355,22 @@
 <div class="main">
   <div class="pane">
     <div class="pane-header"><span class="dot dot-sas"></span> SAS Input</div>
+    <div class="tab-bar" id="tabBar">
+      <button class="tab-btn active" data-mode="single">Single File</button>
+      <button class="tab-btn" data-mode="project">Project</button>
+    </div>
     <div class="editor-wrap">
-      <textarea id="sasInput" placeholder="Paste your SAS code here..." spellcheck="false"></textarea>
+      <div class="mode-pane mode-single active" id="modeSingle">
+        <textarea id="sasInput" placeholder="Paste your SAS code here..." spellcheck="false"></textarea>
+      </div>
+      <div class="mode-pane mode-project" id="modeProject">
+        <div class="drop-zone" id="dropZone">
+          Drag & drop multiple .sas files here<br>
+          or click to select files
+        </div>
+        <input type="file" id="projectInput" multiple accept=".sas" style="display:none;">
+        <ul class="file-list" id="projectList"></ul>
+      </div>
     </div>
   </div>
   <div class="pane">
@@ -2470,6 +2554,223 @@ function highlightPython(code) {
   return result;
 }
 
+// ── Project Mode ─────────────────────────────────────────────────────────
+
+let currentMode = 'single';
+let projectFiles = [];
+
+function convertDispatcher() {
+  if (currentMode === 'project') return convertProject();
+  return convert();
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+  document.getElementById('modeSingle').classList.toggle('active', mode === 'single');
+  document.getElementById('modeProject').classList.toggle('active', mode === 'project');
+  if (mode === 'single') {
+    document.getElementById('status').textContent = '';
+  } else {
+    document.getElementById('status').textContent = projectFiles.length ? `Project mode: ${projectFiles.length} files` : 'Project mode: no files';
+  }
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({ name: file.name, content: reader.result || '' });
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+}
+
+async function handleProjectFiles(fileList) {
+  const files = Array.from(fileList || []).filter(f => f.name.toLowerCase().endsWith('.sas'));
+  if (files.length === 0) { showToast('Please select .sas files'); return; }
+  try {
+    const results = await Promise.all(files.map(readFileAsText));
+    projectFiles = results;
+    renderProjectList();
+    if (currentMode === 'project') {
+      document.getElementById('status').textContent = `Project mode: ${projectFiles.length} files`;
+    }
+  } catch (e) {
+    showToast('Failed to read files');
+  }
+}
+
+function renderProjectList() {
+  const list = document.getElementById('projectList');
+  list.innerHTML = '';
+  if (projectFiles.length === 0) {
+    const li = document.createElement('li');
+    li.style.opacity = '0.6';
+    li.textContent = 'No files loaded';
+    list.appendChild(li);
+    return;
+  }
+  for (const f of projectFiles) {
+    const li = document.createElement('li');
+    li.textContent = f.name;
+    list.appendChild(li);
+  }
+}
+
+function normalizeIncludeTarget(path) {
+  return path.split(/[\\/]/).pop().toLowerCase();
+}
+
+function extractIncludes(content) {
+  const includes = [];
+  const re = /%include\s+['"]([^'"]+)['"]/gi;
+  let m;
+  while ((m = re.exec(content)) !== null) {
+    includes.push(normalizeIncludeTarget(m[1]));
+  }
+  return includes;
+}
+
+function resolveDependencyOrder(files) {
+  const map = new Map();
+  for (const f of files) map.set(f.name.toLowerCase(), f);
+
+  const graph = new Map();
+  const indeg = new Map();
+  for (const key of map.keys()) {
+    graph.set(key, new Set());
+    indeg.set(key, 0);
+  }
+
+  for (const f of files) {
+    const fromKey = f.name.toLowerCase();
+    const includes = extractIncludes(f.content);
+    for (const inc of includes) {
+      if (!map.has(inc)) continue;
+      if (!graph.get(inc).has(fromKey)) {
+        graph.get(inc).add(fromKey);
+        indeg.set(fromKey, indeg.get(fromKey) + 1);
+      }
+    }
+  }
+
+  const queue = [...indeg.entries()].filter(([, d]) => d === 0).map(([k]) => k).sort();
+  const result = [];
+  while (queue.length > 0) {
+    const key = queue.shift();
+    result.push(key);
+    for (const dep of graph.get(key)) {
+      indeg.set(dep, indeg.get(dep) - 1);
+      if (indeg.get(dep) === 0) queue.push(dep);
+    }
+    queue.sort();
+  }
+
+  const hasCycle = result.length !== map.size;
+  if (hasCycle) {
+    const remaining = files.map(f => f.name.toLowerCase()).filter(k => !result.includes(k));
+    result.push(...remaining);
+  }
+
+  return { order: result.map(k => map.get(k)), hasCycle };
+}
+
+function collectMacroRegistry(files) {
+  const registry = {};
+  const re = /%macro\s+(\w+)\s*(?:\(([^)]*)\))?\s*;/gi;
+  for (const f of files) {
+    let m;
+    while ((m = re.exec(f.content)) !== null) {
+      const name = m[1];
+      const paramsText = (m[2] || '').trim();
+      const params = paramsText ? paramsText.split(',').map(p => p.trim().split('=')[0]) : [];
+      registry[name.toLowerCase()] = { name, params };
+    }
+  }
+  return registry;
+}
+
+function collectLibnameBlocks(files) {
+  const set = new Set();
+  for (const f of files) {
+    const blocks = splitBlocks(f.content);
+    for (const b of blocks) {
+      const t = b.trim();
+      if (t.match(/^libname\s+/i)) {
+        set.add(convertLibname(t));
+      }
+    }
+  }
+  return [...set];
+}
+
+function convertProject() {
+  if (projectFiles.length === 0) { showToast('Add .sas files first'); return; }
+
+  const t0 = performance.now();
+  let py = '';
+  try {
+    const macroRegistry = collectMacroRegistry(projectFiles);
+    const libBlocks = collectLibnameBlocks(projectFiles);
+    const dep = resolveDependencyOrder(projectFiles);
+    const imports = new Set();
+    imports.add('import pandas as pd');
+
+    const sections = [];
+    for (const f of dep.order) {
+      const blocks = splitBlocks(f.content);
+      const pyBlocks = [];
+      for (const block of blocks) {
+        const trimmed = block.trim();
+        if (!trimmed) continue;
+        if (trimmed.match(/^libname\s+/i)) continue;
+
+        const macroDef = trimmed.match(/^%macro\s+/i);
+        const macroCall = trimmed.match(/^%(\w+)\b/i);
+        if (macroCall && !macroDef) {
+          const key = macroCall[1].toLowerCase();
+          if (macroRegistry[key]) {
+            const converted = convertMacroCall(trimmed);
+            if (converted.trim()) pyBlocks.push(converted);
+          } else {
+            pyBlocks.push(trimmed.split('\n').map(l => '# ' + l).join('\n'));
+          }
+          continue;
+        }
+
+        const converted = convertBlock(block, imports);
+        if (converted.trim()) pyBlocks.push(converted);
+      }
+
+      if (pyBlocks.length > 0) {
+        sections.push(`# === from: ${f.name} ===\n${pyBlocks.join('\n\n')}`);
+      }
+    }
+
+    const allSas = projectFiles.map(f => f.content).join('\n');
+    const importLines = buildImports(imports, allSas);
+    const lint = [
+      '# NOTE: Review before running. Bare variable names in expressions (e.g. age ** 2)',
+      '#   may need df["col"] prefix (e.g. df["age"] ** 2). Check all lines with # TODO.',
+    ].join('\n');
+    const warning = dep.hasCycle ? '# WARNING: Circular %INCLUDE dependencies detected. Output order may be incomplete.' : '';
+    const libBlock = libBlocks.length ? ['# Shared LIBNAME config', ...libBlocks].join('\n\n') : '';
+
+    const headerParts = [importLines.join('\n'), libBlock, warning, lint].filter(Boolean).join('\n\n');
+    const body = sections.join('\n\n');
+    py = headerParts + (headerParts && body ? '\n\n' : '') + body;
+  } catch (e) {
+    py = `# Conversion error: ${e.message}\n# Please check the project files for syntax issues.`;
+  }
+
+  const ms = Math.round(performance.now() - t0);
+  document.getElementById('pyOutput').innerHTML = highlightPython(py);
+  const fileCount = projectFiles.length;
+  document.getElementById('status').textContent = `Converted project (${fileCount} files) in ${ms}ms`;
+}
+
 // ── UI ───────────────────────────────────────────────────────────────────
 
 function copyOutput() {
@@ -2479,10 +2780,29 @@ function copyOutput() {
   navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard'));
 }
 
+function downloadOutput() {
+  const el = document.getElementById('pyOutput');
+  const text = el.innerText || el.textContent;
+  if (!text.trim()) { showToast('Nothing to download'); return; }
+  const blob = new Blob([text], { type: 'text/x-python' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const suffix = currentMode === 'project' ? 'sas_project.py' : 'sas_single.py';
+  a.href = url;
+  a.download = suffix;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast('Downloaded .py');
+}
+
 function clearAll() {
   document.getElementById('sasInput').value = '';
   document.getElementById('pyOutput').innerHTML = '';
   document.getElementById('status').textContent = '';
+  projectFiles = [];
+  renderProjectList();
 }
 
 function showToast(msg) {
@@ -2503,6 +2823,7 @@ function toggleSamples() {
     const btn = document.createElement('button');
     btn.textContent = name;
     btn.onclick = () => {
+      setMode('single');
       document.getElementById('sasInput').value = code;
       menu.classList.remove('open');
       convert();
@@ -2522,7 +2843,7 @@ document.addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     e.preventDefault();
-    convert();
+    convertDispatcher();
   }
 });
 
@@ -2537,6 +2858,36 @@ document.getElementById('sasInput').addEventListener('keydown', (e) => {
     ta.selectionStart = ta.selectionEnd = start + 4;
   }
 });
+
+// Tabs
+document.getElementById('tabBar').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  setMode(btn.dataset.mode);
+});
+
+// Project file handling
+const dropZone = document.getElementById('dropZone');
+const projectInput = document.getElementById('projectInput');
+
+dropZone.addEventListener('click', () => projectInput.click());
+dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dropZone.classList.add('dragover');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  handleProjectFiles(e.dataTransfer.files);
+});
+
+projectInput.addEventListener('change', (e) => {
+  handleProjectFiles(e.target.files);
+  projectInput.value = '';
+});
+
+renderProjectList();
 </script>
 
 </body>
